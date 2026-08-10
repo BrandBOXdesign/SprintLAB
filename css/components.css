@@ -16,7 +16,7 @@
   .athlete-card:hover { border-color: var(--gold); }
   .athlete-avatar { width: 44px; height: 44px; border-radius: 50%; background: var(--border); display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 800; color: var(--gold); flex-shrink: 0; font-family: 'Arial Narrow', Arial, sans-serif; }
   .athlete-info { flex: 1; }
-  .athlete-name { font-size: 16px; font-weight: 700; color: var(--text); }
+  .athlete-name { font-size: 16px; font-weight: 700; }
   .athlete-meta { font-size: 12px; color: var(--muted); margin-top: 3px; }
   .athlete-sessions { font-size: 11px; color: var(--gold); margin-top: 2px; }
   .athlete-chevron { color: var(--muted); font-size: 18px; }
@@ -89,12 +89,25 @@
   /* Fase 2.2 del roadmap: video local por sesion (grabacion, reproduccion, marcadores). */
   .video-block { display: flex; flex-direction: column; gap: 8px; }
   .video-record-box { display: flex; flex-direction: column; gap: 8px; }
-  .video-preview, .video-player { width: 100%; max-height: 360px; border-radius: 6px; border: 1px solid var(--border); background: #000; display: block; }
+  .video-preview, .video-player { width: 100%; max-height: 360px; border-radius: 6px; border: 1px solid var(--border); background: #000; display: block; object-fit: contain; }
   .video-record-controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
   .video-record-timer { font-size: 13px; font-weight: 700; color: var(--red); }
   .video-loading { font-size: 13px; color: var(--muted); padding: 8px 0; }
   .video-error { font-size: 12.5px; color: var(--red); background: rgba(200,51,42,0.08); border: 1px solid rgba(200,51,42,0.3); border-radius: 4px; padding: 8px 10px; }
   .video-player-wrap { display: flex; flex-direction: column; gap: 8px; }
+  .video-speed-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .video-speed-label { font-size: 11.5px; color: var(--muted); }
+  .speed-btn { padding: 3px 10px; font-size: 12px; border-radius: 4px; border: 1px solid var(--border); background: var(--bg); cursor: pointer; }
+  .speed-btn-active { background: var(--gold); border-color: var(--gold); color: #000; font-weight: 600; }
+  /* Fase A del roadmap de "sprint lab": canvas del esqueleto superpuesto
+     exactamente sobre el <video> (mismo tamaño renderizado, ver
+     skeletonOverlay.js). pointer-events:none para que los controles
+     nativos del video (play, barra de progreso) sigan siendo clicables
+     a traves del canvas. La capa oscura semitransparente para contraste
+     se dibuja dentro del propio canvas (ver drawSkeleton en
+     skeletonOverlay.js), no aqui en CSS. */
+  .video-canvas-stack { position: relative; width: 100%; line-height: 0; }
+  .skeleton-overlay { position: absolute; top: 0; left: 0; pointer-events: none; display: block; }
   .video-marker-form { display: flex; gap: 8px; align-items: center; }
   .video-marker-form input { flex: 1; }
   .video-markers { display: flex; flex-direction: column; gap: 6px; }

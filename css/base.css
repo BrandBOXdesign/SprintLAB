@@ -1,7 +1,6 @@
 /* Auto-generado a partir de index_-_copia.html durante la modularizacion (2026-07-04) */
   * { box-sizing: border-box; }
-  html, body { margin: 0; padding: 0; background: var(--bg) url('../assets/images/bg-runner.jpg') no-repeat center top / cover fixed; color: var(--text); font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; font-size: 14px; }
-  body { -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font-family: 'Helvetica Neue', Arial, sans-serif; }
   #app { min-height: 100vh; display: flex; flex-direction: column; max-width: 480px; margin: 0 auto; position: relative; }
   .loading-screen { min-height: 100vh; display: flex; align-items: center; justify-content: center; }
   .loading-text { color: var(--red); font-size: 14px; letter-spacing: 4px; font-weight: 700; }

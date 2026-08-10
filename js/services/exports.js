@@ -31,23 +31,7 @@ export function exportSessionsCSV() {
 export function exportProfileJSON() {
   const athlete = state.athlete, sessions = state.sessions;
   if (!athlete) return;
-  // backupSchema: 1 -- marcador para que importBackupJSON() (imports.js)
-  // pueda validar que el archivo es realmente un backup de Sprint Lab antes
-  // de intentar restaurarlo. Antes este backup no incluia weeklyPlan,
-  // customPhases ni competitions -- se restauraba el atleta pero se perdian
-  // silenciosamente esas tres cosas. Ahora el backup es completo.
-  const data = {
-    backupSchema: 1,
-    exportDate: new Date().toISOString(),
-    appVersion: 'Sprint Lab v2',
-    athlete,
-    model: state.model,
-    clinicalNotes: DB.getClinicalNotes(state.currentAthleteId),
-    sessions: [...sessions].sort((a, b) => new Date(a.date) - new Date(b.date)),
-    weeklyPlan: state.weeklyPlan,
-    customPhases: state.customPhases,
-    competitions: state.competitions,
-  };
+  const data = { exportDate: new Date().toISOString(), appVersion: 'Sprint Lab v2', athlete, model: state.model, clinicalNotes: DB.getClinicalNotes(state.currentAthleteId), sessions: [...sessions].sort((a, b) => new Date(a.date) - new Date(b.date)) };
   const json = JSON.stringify(data, null, 2);
   const blob = new Blob([json], { type: 'application/json;charset=utf-8;' });
   const url = URL.createObjectURL(blob);

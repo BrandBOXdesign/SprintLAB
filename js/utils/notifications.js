@@ -2,8 +2,7 @@
 import { DB } from '../db/db.js';
 import { render } from '../render/layout.js';
 import { state } from '../state/state.js';
-import { acuteChronicRatio, getBestTimes, getNextCompetition, getNextSession, getPeakingAlert, registrationGapDays } from './calculations.js';
-import { getAutoBackupStatus } from '../services/autoBackup.js';
+import { acuteChronicRatio, getBestTimes, getNextSession, registrationGapDays } from './calculations.js';
 import { el } from './helpers.js';
 
 export function showToast(msg) {
@@ -30,11 +29,6 @@ export function updateNotifications() {
     else if (ratio > 1.5) notifs.push({ id: 'ratio-high', type: 'danger', msg: `🔴 Ratio AC alto (${ratio.toFixed(2)}). Riesgo de lesión.` });
     else notifs.push({ id: 'ratio-ok', type: 'success', msg: `✅ Ratio AC en zona óptima (${ratio.toFixed(2)}). Buen trabajo.` });
   }
-  // Fase 6.2: recordatorio de peaking (taper) si hay una competencia
-  // prioridad A a 21 dias o menos.
-  const nextComp = getNextCompetition(state.competitions);
-  const peaking = getPeakingAlert(nextComp);
-  if (peaking) notifs.push({ id: 'peaking-' + nextComp.id, type: peaking.days <= 7 ? 'danger' : 'warning', msg: peaking.msg });
   const next = getNextSession(weeklyPlan);
   if (next) {
     const days = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
@@ -65,22 +59,10 @@ export function updateNotifications() {
   // Fase 1.2 del roadmap (version simplificada, sin Google Drive/OneDrive):
   // recordatorio de backup local si han pasado 7+ dias desde el ultimo
   // "Backup JSON" descargado (o si nunca se ha hecho uno).
-  //
-  // Fase 6.3: si el respaldo automático (services/autoBackup.js) está
-  // disponible y corrió en las últimas 48h, este aviso ya no tiene sentido
-  // -- estaría regañando por algo que la app ya está resolviendo sola. Solo
-  // se muestra si el respaldo automático no está disponible (ej. corriendo
-  // en un navegador normal en vez de la app empacada) o si, por algún
-  // motivo, dejó de correr.
-  const autoBackup = getAutoBackupStatus();
-  const autoBackupHoursSince = autoBackup.lastBackup ? (Date.now() - new Date(autoBackup.lastBackup).getTime()) / 3600000 : Infinity;
-  const autoBackupHealthy = autoBackup.available && autoBackupHoursSince < 48;
-  if (!autoBackupHealthy) {
-    const lastBackup = DB.getLastBackupDate();
-    const daysSinceBackup = lastBackup ? Math.floor((Date.now() - new Date(lastBackup).getTime()) / (1000 * 60 * 60 * 24)) : null;
-    if (daysSinceBackup === null) notifs.push({ id: 'backup-never', type: 'warning', msg: '💾 Todavía no has hecho ningún backup local. Ve a "Estado" y descarga tu Backup JSON por seguridad.' });
-    else if (daysSinceBackup >= 7) notifs.push({ id: 'backup-due-' + Math.floor(daysSinceBackup / 7), type: 'warning', msg: `💾 Han pasado ${daysSinceBackup} días desde tu último backup local. Descarga uno nuevo desde "Estado".` });
-  }
+  const lastBackup = DB.getLastBackupDate();
+  const daysSinceBackup = lastBackup ? Math.floor((Date.now() - new Date(lastBackup).getTime()) / (1000 * 60 * 60 * 24)) : null;
+  if (daysSinceBackup === null) notifs.push({ id: 'backup-never', type: 'warning', msg: '💾 Todavía no has hecho ningún backup local. Ve a "Estado" y descarga tu Backup JSON por seguridad.' });
+  else if (daysSinceBackup >= 7) notifs.push({ id: 'backup-due-' + Math.floor(daysSinceBackup / 7), type: 'warning', msg: `💾 Han pasado ${daysSinceBackup} días desde tu último backup local. Descarga uno nuevo desde "Estado".` });
   state.notifications = notifs.filter(n => !dismissed.includes(n.id));
 }
 

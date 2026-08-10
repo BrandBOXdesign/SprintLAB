@@ -1,7 +1,6 @@
 // Auto-generado a partir de index_-_copia.html durante la modularizacion (2026-07-04)
 import { confirmDeleteAthlete } from '../actions/athletes.js';
 import { handleAuthSubmit, handleSignOut, handleSyncNow, setAuthFormField, toggleAuthFormMode } from '../actions/auth.js';
-import { addCompetition, cancelDeleteCompetition, clearCompetitionResult, closeResultForm, confirmDeleteCompetition, executeDeleteCompetition, openResultForm, saveCompetitionResult, updateCompetitionField, updateResultFormField } from '../actions/competitions.js';
 import { addPhase, cancelDeletePhase, confirmDeletePhase, executeDeletePhase, reorderPhases, savePhaseWeeklyTemplate, updatePhaseField } from '../actions/phases.js';
 import { saveCurrentAthlete, saveCurrentModel } from '../actions/profile.js';
 import { DB } from '../db/db.js';
@@ -9,8 +8,7 @@ import { MACRO_MODELS } from '../models/macrocycles.js';
 import { render } from './layout.js';
 import { FIREBASE_CONFIGURED } from '../services/firebaseConfig.js';
 import { state } from '../state/state.js';
-import { checkWindLegal, sortCompetitions } from '../utils/calculations.js';
-import { COMPETITION_PRIORITY, DAY_COLORS } from '../utils/constants.js';
+import { DAY_COLORS } from '../utils/constants.js';
 import { decimalInput, el, field, sectionLabel, todayISO } from '../utils/helpers.js';
 import { showToast } from '../utils/notifications.js';
 
@@ -140,100 +138,6 @@ function renderPhasesEditor() {
   ]);
 }
 
-function renderResultForm(comp) {
-  const f = state.competitionResultForm;
-  const showsBoth = comp.distance === 'both';
-  const windBadge = (wind) => {
-    const legal = checkWindLegal(wind);
-    if (legal === null) return null;
-    return el('span', { style: { fontSize: '11px', marginLeft: '8px', color: legal ? 'var(--green)' : 'var(--red)' } },
-      legal ? '✓ viento legal' : '✕ viento ilegal (World Athletics, > +2.0 m/s)');
-  };
-  const rows = [];
-  if (comp.distance === '100' || showsBoth) {
-    rows.push(el('div', { class: 'row' }, [
-      field('Tiempo 100m (s)', decimalInput({ value: f.time100, placeholder: '—', oninput: e => updateResultFormField('time100', e.target.value) }), true),
-      field('Viento 100m (m/s)', el('div', {}, [decimalInput({ value: f.wind100, placeholder: '—', oninput: e => { updateResultFormField('wind100', e.target.value); render(); } }), windBadge(f.wind100)]), true),
-    ]));
-  }
-  if (comp.distance === '200' || showsBoth) {
-    rows.push(el('div', { class: 'row' }, [
-      field('Tiempo 200m (s)', decimalInput({ value: f.time200, placeholder: '—', oninput: e => updateResultFormField('time200', e.target.value) }), true),
-      field('Viento 200m (m/s)', el('div', {}, [decimalInput({ value: f.wind200, placeholder: '—', oninput: e => { updateResultFormField('wind200', e.target.value); render(); } }), windBadge(f.wind200)]), true),
-    ]));
-  }
-  return el('div', { style: { marginTop: '8px', paddingTop: '8px', borderTop: '1px solid var(--border)' } }, [
-    ...rows,
-    field('Lugar / posición', el('input', { value: f.position, placeholder: 'ej. 2° lugar', oninput: e => updateResultFormField('position', e.target.value) })),
-    field('Notas', el('input', { value: f.notes, placeholder: 'condiciones, sensaciones...', oninput: e => updateResultFormField('notes', e.target.value) })),
-    el('div', { style: { display: 'flex', gap: '8px', marginTop: '6px' } }, [
-      el('button', { class: 'primary-button', onClick: () => saveCompetitionResult(comp.id) }, 'Guardar resultado'),
-      el('button', { class: 'secondary-button', onClick: closeResultForm }, 'Cancelar'),
-    ]),
-  ]);
-}
-
-function renderCompetitionsEditor() {
-  const competitions = sortCompetitions(state.competitions || []);
-  const list = el('div', { class: 'phase-list' }, competitions.map(c => {
-    const nameInput = el('input', { value: c.name, oninput: e => updateCompetitionField(c.id, 'name', e.target.value) });
-    const dateInput = el('input', { type: 'date', value: c.date, oninput: e => updateCompetitionField(c.id, 'date', e.target.value) });
-    const locationInput = el('input', { value: c.location || '', placeholder: 'Sede (opcional)', oninput: e => updateCompetitionField(c.id, 'location', e.target.value) });
-    const prioritySel = el('select', { oninput: e => updateCompetitionField(c.id, 'priority', e.target.value) }, [
-      el('option', { value: 'A', selected: c.priority === 'A' }, 'A · Objetivo principal'),
-      el('option', { value: 'B', selected: c.priority === 'B' }, 'B · Importante'),
-      el('option', { value: 'C', selected: c.priority === 'C' }, 'C · Preparación'),
-    ]);
-    prioritySel.value = c.priority;
-    const distanceSel = el('select', { oninput: e => updateCompetitionField(c.id, 'distance', e.target.value) }, [
-      el('option', { value: '100', selected: c.distance === '100' }, '100m'),
-      el('option', { value: '200', selected: c.distance === '200' }, '200m'),
-      el('option', { value: 'both', selected: c.distance === 'both' }, '100m y 200m'),
-    ]);
-    distanceSel.value = c.distance;
-    const target100 = decimalInput({ value: c.targetTime100 || '', placeholder: '—', oninput: e => updateCompetitionField(c.id, 'targetTime100', e.target.value) });
-    const target200 = decimalInput({ value: c.targetTime200 || '', placeholder: '—', oninput: e => updateCompetitionField(c.id, 'targetTime200', e.target.value) });
-    const isEditingResult = state.editingResultId === c.id;
-    const resultSummary = c.result
-      ? el('div', { style: { fontSize: '12px', color: 'var(--text2)', marginTop: '6px' } },
-          `Resultado: ${c.result.time100 ? c.result.time100 + 's (100m) ' : ''}${c.result.time200 ? c.result.time200 + 's (200m) ' : ''}${c.result.position ? '· ' + c.result.position : ''}`)
-      : null;
-    return el('div', { class: 'phase-row', 'data-id': c.id, style: { flexDirection: 'column', alignItems: 'stretch' } }, [
-      el('div', { style: { display: 'flex', alignItems: 'center', gap: '8px' } }, [
-        el('div', { style: { width: '6px', height: '28px', borderRadius: '2px', flexShrink: 0, backgroundColor: COMPETITION_PRIORITY[c.priority].color } }),
-        nameInput,
-        dateInput,
-        el('button', { class: 'danger-button', style: { width: 'auto', padding: '6px 10px' }, onClick: () => confirmDeleteCompetition(c.id) }, '✕'),
-      ]),
-      locationInput,
-      el('div', { class: 'row' }, [field('Prioridad', prioritySel, true), field('Prueba', distanceSel, true)]),
-      el('div', { class: 'row' }, [field('Marca objetivo 100m (s)', target100, true), field('Marca objetivo 200m (s)', target200, true)]),
-      el('button', { class: 'secondary-button', style: { marginTop: '6px' }, onClick: () => isEditingResult ? closeResultForm() : openResultForm(c.id) }, isEditingResult ? 'Cerrar' : (c.result ? 'Editar resultado' : 'Registrar resultado')),
-      resultSummary,
-      isEditingResult ? renderResultForm(c) : null,
-      c.result && !isEditingResult ? el('button', { class: 'danger-button', style: { width: 'auto', marginTop: '6px', fontSize: '11px', padding: '4px 8px' }, onClick: () => clearCompetitionResult(c.id) }, 'Borrar resultado') : null,
-    ]);
-  }));
-
-  const confirmModal = state.confirmDeleteCompetitionId ? el('div', { class: 'modal-overlay' }, [
-    el('div', { class: 'modal-box' }, [
-      el('div', { class: 'modal-title' }, 'Eliminar competencia'),
-      el('div', { class: 'modal-body' }, 'Esta competencia y su resultado (si lo hay) se eliminarán permanentemente.'),
-      el('div', { class: 'modal-actions' }, [
-        el('button', { class: 'danger-button', onClick: () => executeDeleteCompetition(state.confirmDeleteCompetitionId) }, 'Eliminar'),
-        el('button', { class: 'secondary-button', onClick: cancelDeleteCompetition }, 'Cancelar'),
-      ]),
-    ]),
-  ]) : null;
-
-  return el('div', {}, [
-    el('p', { class: 'helper-text' }, 'Registra las competencias de la temporada y marca cuáles son prioridad A (el objetivo real). Cuando falten pocas semanas para una competencia A, la app te avisará en el tablero y en la semana para que consideres el taper.'),
-    competitions.length ? list : el('div', { class: 'empty-state' }, 'Aún no hay competencias registradas.'),
-    el('button', { class: 'secondary-button', onClick: addCompetition }, '+ Agregar competencia'),
-    confirmModal,
-  ]);
-}
-
 export function renderProfileScreen() {
   const form = state.profileForm;
   const nameInput = el('input', { value: form.name, placeholder: 'Nombre del atleta', oninput: e => form.name = e.target.value });
@@ -272,6 +176,6 @@ export function renderProfileScreen() {
     el('div', { class: 'notes-save-row' }, [el('button', { class: 'notes-save-btn', onClick: () => { DB.saveClinicalNotes(state.currentAthleteId, notesArea.value); showToast('Notas guardadas'); } }, 'Guardar notas')]),
   ]);
   const dangerZone = el('div', { class: 'danger-zone' }, [el('div', { class: 'danger-zone-title' }, 'Zona de riesgo'), el('button', { class: 'danger-button', style: { width: '100%', padding: '12px' }, onClick: () => confirmDeleteAthlete(state.currentAthleteId) }, 'Eliminar a ' + (state.athlete ? state.athlete.name : 'este atleta') + ' y todos sus datos')]);
-  return el('div', { class: 'screen' }, [sectionLabel('01', 'Atleta'), card, sectionLabel('02', 'Notas clínicas'), notesCard, sectionLabel('03', 'Modelo de macrociclo'), el('p', { class: 'helper-text' }, 'Elige cómo se estructura el año de entrenamiento. Puedes cambiarlo después.'), laneSelector, phasesEditor, el('div', { class: 'disclaimer' }, 'Esta app aplica modelos de periodización y fórmulas públicamente documentadas (Epley, Brzycki, ratio de carga aguda:crónica por EWMA — Williams, Trewartha, Kemp & Stokes, 2016). No sustituye a un entrenador certificado ni a evaluación médico-deportiva.'), sectionLabel('04', 'Competencias'), renderCompetitionsEditor(), sectionLabel('05', 'Nube'), renderCloudCard(), dangerZone]);
+  return el('div', { class: 'screen' }, [sectionLabel('01', 'Atleta'), card, sectionLabel('02', 'Notas clínicas'), notesCard, sectionLabel('03', 'Modelo de macrociclo'), el('p', { class: 'helper-text' }, 'Elige cómo se estructura el año de entrenamiento. Puedes cambiarlo después.'), laneSelector, phasesEditor, el('div', { class: 'disclaimer' }, 'Esta app aplica modelos de periodización y fórmulas públicamente documentadas (Epley, Brzycki, ratio de carga aguda:crónica). No sustituye a un entrenador certificado ni a evaluación médico-deportiva.'), sectionLabel('04', 'Nube'), renderCloudCard(), dangerZone]);
 }
 

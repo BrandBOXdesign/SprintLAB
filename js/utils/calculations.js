@@ -11,60 +11,7 @@ export function estimateVelocity(weight, rm) { if (!weight || !rm || rm <= 0) re
 
 export function estimatePower(weight, velocity) { if (!weight || !velocity) return null; return weight * 9.81 * velocity; }
 
-// ============================================================
-//  Fase 6.1 — Ratio agudo:crónico por EWMA (Williams, Trewartha, Kemp &
-//  Stokes, 2016), en vez de ventanas fijas de 7/28 días.
-// ============================================================
-// El metodo de ventanas fijas (7 dias / 28 dias, mas abajo en
-// acuteChronicRatioClassic) pesa igual el dia 1 y el dia 7 de la semana, y
-// da saltos bruscos cuando una sesion entra o sale de la ventana de golpe
-// (por ejemplo, una sesion muy dura "desaparece" del calculo de un dia
-// para el otro en cuanto cumple 8 dias). El metodo EWMA --el que usan
-// Catapult, Kinexon y la mayoria de la literatura de ciencias del deporte
-// desde 2016-- pondera cada dia con un decaimiento exponencial: los dias
-// recientes pesan mas y los viejos decaen suave en vez de desaparecer:
-//
-//   EWMA_hoy = carga_hoy * lambda + EWMA_ayer * (1 - lambda)
-//   lambda = 2 / (N + 1)   -- N=7 dias para la carga aguda, N=28 para la cronica
-//
-// Se mantiene la misma firma de funcion (sessions, asOfDate) para que
-// todo el resto de la app (dashboard, semana, notificaciones, PDF, lista
-// de atletas) siga funcionando sin cambios -- es un cambio de formula, no
-// de arquitectura.
-const ACUTE_EWMA_DAYS = 7;
-const CHRONIC_EWMA_DAYS = 28;
-function ewmaLambda(days) { return 2 / (days + 1); }
-
 export function acuteChronicRatio(sessions, asOfDate = new Date()) {
-  if (!sessions.length) return null;
-  const sorted = [...sessions].sort((a, b) => new Date(a.date) - new Date(b.date));
-  const firstDay = new Date(sorted[0].date); firstDay.setHours(0, 0, 0, 0);
-  const lastDay = new Date(asOfDate); lastDay.setHours(0, 0, 0, 0);
-  if (lastDay < firstDay) return null;
-
-  // Carga total por dia (TRIMP: RPE x duracion), 0 en los dias sin sesion,
-  // desde el primer registro del atleta hasta la fecha pedida.
-  const totalDays = Math.floor((lastDay - firstDay) / 86400000) + 1;
-  const dailyLoads = new Array(totalDays).fill(0);
-  sorted.forEach(s => {
-    const d = new Date(s.date); d.setHours(0, 0, 0, 0);
-    const idx = Math.floor((d - firstDay) / 86400000);
-    if (idx >= 0 && idx < totalDays) dailyLoads[idx] += calcularTRIMP(s);
-  });
-
-  const lambdaA = ewmaLambda(ACUTE_EWMA_DAYS), lambdaC = ewmaLambda(CHRONIC_EWMA_DAYS);
-  let ewmaAcute = dailyLoads[0], ewmaChronic = dailyLoads[0];
-  for (let i = 1; i < totalDays; i++) {
-    ewmaAcute = dailyLoads[i] * lambdaA + ewmaAcute * (1 - lambdaA);
-    ewmaChronic = dailyLoads[i] * lambdaC + ewmaChronic * (1 - lambdaC);
-  }
-  if (ewmaChronic === 0) return null;
-  return ewmaAcute / ewmaChronic;
-}
-
-// Version clasica (ventanas fijas 7/28 dias), conservada solo como
-// referencia/auditoria -- ya no la usa ninguna pantalla de la app.
-export function acuteChronicRatioClassic(sessions, asOfDate = new Date()) {
   if (!sessions.length) return null;
   const now = asOfDate;
   const d7 = new Date(now - 7 * 86400000);
@@ -533,56 +480,6 @@ export function validateNum(value, ruleKey) {
   return { ok: true };
 }
 
-// ============================================================
-//  Fase 6.2 — Calendario de competencias y peaking
-// ============================================================
-/**
- * Regla de World Athletics: una marca solo es válida para récord si el
- * viento a favor (positivo) no supera +2.0 m/s. Viento en contra
- * (negativo), sin importar la magnitud, siempre es legal. Devuelve null
- * si no hay dato de viento (no se puede afirmar nada).
- */
-export function checkWindLegal(wind) {
-  if (wind === null || wind === undefined || wind === '') return null;
-  const n = Number(wind);
-  if (isNaN(n)) return null;
-  return n <= 2.0;
-}
-
-export function sortCompetitions(competitions) {
-  return [...(competitions || [])].sort((a, b) => new Date(a.date) - new Date(b.date));
-}
-
-/** Días calendario hasta la fecha (positivo = futuro, negativo = ya pasó). */
-export function daysUntil(dateStr, asOfDate = new Date()) {
-  const today = new Date(asOfDate); today.setHours(0, 0, 0, 0);
-  const target = new Date(dateStr + 'T12:00:00'); target.setHours(0, 0, 0, 0);
-  return Math.round((target - today) / 86400000);
-}
-
-/** Próxima competencia desde hoy (o null si no hay ninguna futura). */
-export function getNextCompetition(competitions, asOfDate = new Date()) {
-  const today = new Date(asOfDate); today.setHours(0, 0, 0, 0);
-  const upcoming = sortCompetitions(competitions).filter(c => daysUntil(c.date, today) >= 0);
-  return upcoming[0] || null;
-}
-
-/**
- * Aviso de peaking: recordatorio (no una detección automática validada)
- * de que, si la próxima competencia es prioridad A y falta poco, conviene
- * estar en descarga (taper) en vez de carga plena. No verifica el plan
- * real -- eso queda a criterio del entrenador -- solo avisa la fecha.
- */
-export function getPeakingAlert(nextComp, asOfDate = new Date()) {
-  if (!nextComp || nextComp.priority !== 'A') return null;
-  const days = daysUntil(nextComp.date, asOfDate);
-  if (days < 0 || days > 21) return null;
-  const weeksLeft = Math.max(1, Math.ceil(days / 7));
-  const msg = days <= 7
-    ? `🎯 Faltan ${days} día${days === 1 ? '' : 's'} para "${nextComp.name}" (prioridad A). Debería estar en descarga (taper), no en carga plena.`
-    : `🎯 Faltan ${weeksLeft} semanas para "${nextComp.name}" (prioridad A). Empieza a planear el taper de cara a esa fecha.`;
-  return { weeksLeft, days, msg };
-}
 export function validateLogForm(form) {
   const errors = [];
   if (!form.duration) { errors.push('La duración es obligatoria.'); return errors; }

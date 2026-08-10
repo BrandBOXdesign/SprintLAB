@@ -1,6 +1,5 @@
 // Auto-generado a partir de index_-_copia.html durante la modularizacion (2026-07-04)
 import { backToAthletes, executeDeleteAthlete, openNewAthleteForm, saveNewAthlete, selectAthlete } from '../actions/athletes.js';
-import { cancelRestoreBackup, confirmRestoreBackup, importBackupJSON } from '../services/imports.js';
 import { DB } from '../db/db.js';
 import { render } from './layout.js';
 import { state } from '../state/state.js';
@@ -39,36 +38,6 @@ export function renderAthletesScreen() {
   } else screen.appendChild(el('p', { class: 'helper-text', style: { textAlign: 'center', padding: '20px 0' } }, 'No hay atletas registrados todavía. Agrega el primero.'));
   const newBtn = el('button', { class: 'new-athlete-btn', onClick: openNewAthleteForm }, [el('span', { class: 'new-athlete-plus' }, '+'), el('span', {}, 'Nuevo atleta')]);
   screen.appendChild(newBtn);
-
-  // Restaurar desde Backup JSON (manual o el respaldo automático completo)
-  // vive aquí también, y no solo dentro de Estado, porque este es el único
-  // lugar de la app al que se puede llegar sin tener ya un atleta cargado
-  // -- justo el escenario real de "perdí todo, reinstalé la app".
-  const restoreFileInput = el('input', { type: 'file', id: 'file-input-restore-athletes', accept: '.json', style: { display: 'none' }, onchange: (e) => { const file = e.target.files[0]; if (file) importBackupJSON(file); e.target.value = ''; } });
-  const restoreBtn = el('button', { class: 'secondary-button', style: { marginTop: '10px' }, onClick: () => document.getElementById('file-input-restore-athletes').click() }, '♻️ Restaurar desde Backup JSON');
-  screen.appendChild(restoreBtn);
-  screen.appendChild(restoreFileInput);
-
-  if (state.pendingRestore) {
-    const p = state.pendingRestore;
-    const body = p.isMulti
-      ? (p.isOverwrite
-          ? `Este es un respaldo automático con ${p.entries.length} atleta(s). Ya existen ${p.overwriteNames.length} de ellos en esta instalación (${p.overwriteNames.join(', ')}) — sus datos actuales se reemplazarán por completo. El resto se agregará como nuevo. Esta acción no se puede deshacer.`
-          : `Este es un respaldo automático con ${p.entries.length} atleta(s), ninguno existe todavía en esta instalación — se agregarán todos como nuevos.`)
-      : (p.isOverwrite
-          ? `Ya existe un atleta llamado "${p.existingName}" con este mismo identificador. Restaurar reemplazará TODOS sus datos actuales con lo que hay en este archivo. Esta acción no se puede deshacer.`
-          : `Se restaurará "${p.data.athlete.name}" como atleta nuevo, con ${(p.data.sessions || []).length} sesiones incluidas en el backup.`);
-    screen.appendChild(el('div', { class: 'modal-overlay' }, [
-      el('div', { class: 'modal-box' }, [
-        el('div', { class: 'modal-title' }, p.isOverwrite ? '⚠️ Sobrescribir datos existentes' : 'Restaurar desde backup'),
-        el('div', { class: 'modal-body' }, body),
-        el('div', { class: 'modal-actions' }, [
-          el('button', { class: 'danger-button', onClick: confirmRestoreBackup }, 'Restaurar'),
-          el('button', { class: 'secondary-button', onClick: cancelRestoreBackup }, 'Cancelar'),
-        ]),
-      ]),
-    ]));
-  }
   if (state.confirmDelete) {
     const a = state.athletes.find(x => x.id === state.confirmDelete);
     const overlay = el('div', { class: 'modal-overlay' }, [

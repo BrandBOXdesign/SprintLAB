@@ -1,6 +1,21 @@
 // Fase A del roadmap de "sprint lab": dibuja el "muñeco de palitos"
 // (esqueleto capturado por analyzeFullSkeleton en poseDetection.js) sobre
 // un <canvas> superpuesto al <video>, sincronizado con video.currentTime.
+// Se dibuja tambien una capa negra semitransparente (20% opacidad) debajo
+// del esqueleto para que las lineas se lean bien sin importar el color del
+// fondo del video -- solo aparece cuando hay un cuadro capturado para
+// mostrar; si todavia no se ha corrido el analisis, el video se ve normal.
+//
+// IMPORTANTE (bug corregido): el <video> usa object-fit:contain (ver
+// components.css), asi que su contenido real puede quedar mas chico que
+// la caja del elemento, centrado, con barras negras a los lados o
+// arriba/abajo si el aspect ratio del clip no coincide con el contenedor
+// (tipico con video vertical de celular). Los landmarks de MediaPipe estan
+// normalizados respecto al FRAME NATIVO del video, no respecto a la caja
+// completa del <video> -- por eso el dibujo pasa por computeContainRect()
+// antes de posicionar cualquier punto, en vez de escalar directo contra el
+// ancho/alto del canvas. Sin esto, el esqueleto se desalinea del corredor
+// cada vez que hay letterboxing (justo el bug reportado).
 //
 // OJO con el patron de esta app: render() en layout.js reconstruye TODO el
 // DOM de #app desde cero en cada llamada (ver comentario ahi). Eso significa
@@ -13,8 +28,20 @@
 // detiene solo -- no hace falta cancelarlo desde afuera.
 const runningLoops = new Set();
 
-/** Busca el cuadro capturado mas cercano a t (vecino mas cercano, sin interpolar -- suficiente para Fase A). */
-function findNearestFrame(frames, t) {
+const MAX_INTERP_GAP = 0.25; // segundos. Si entre dos cuadros capturados hay
+// un hueco mas grande que esto (la deteccion se perdio varios cuadros
+// seguidos -- oclusion, corredor salio del encuadre, etc.), no interpolamos
+// en linea recta entre ellos porque el "salto" real del cuerpo no fue una
+// linea recta. Mejor mostrar el cuadro mas cercano y aceptar un salto visible
+// que inventar un movimiento fantasma que no ocurrio.
+
+/**
+ * Interpola linealmente entre los dos cuadros capturados que rodean a t.
+ * Esto es lo que le da fluidez a la animacion: sin esto, el esqueleto salta
+ * en escalones cada ~66ms (la cadencia de muestreo de analyzeFullSkeleton),
+ * que es perceptible incluso a simple vista.
+ */
+export function interpolateFrames(frames, t) {
   if (!frames || frames.length === 0) return null;
   if (t <= frames[0].t) return frames[0];
   if (t >= frames[frames.length - 1].t) return frames[frames.length - 1];
@@ -23,12 +50,69 @@ function findNearestFrame(frames, t) {
     const mid = (lo + hi) >> 1;
     if (frames[mid].t <= t) lo = mid; else hi = mid;
   }
-  return (t - frames[lo].t) <= (frames[hi].t - t) ? frames[lo] : frames[hi];
+  const fa = frames[lo], fb = frames[hi];
+  const span = fb.t - fa.t;
+  const ratio = span > 0 ? (t - fa.t) / span : 0;
+  if (span > MAX_INTERP_GAP) return ratio < 0.5 ? fa : fb;
+
+  const pts = {};
+  const keys = new Set([...Object.keys(fa.pts), ...Object.keys(fb.pts)]);
+  for (const k of keys) {
+    const pa = fa.pts[k], pb = fb.pts[k];
+    if (pa && pb) {
+      pts[k] = {
+        x: pa.x + (pb.x - pa.x) * ratio,
+        y: pa.y + (pb.y - pa.y) * ratio,
+        visibility: Math.min(pa.visibility, pb.visibility),
+      };
+    } else if (pa && ratio < 0.5) {
+      pts[k] = pa; // el punto desapareció a mitad de camino -- se sostiene el último valor conocido en vez de cortar de golpe
+    } else if (pb && ratio >= 0.5) {
+      pts[k] = pb;
+    }
+  }
+  return { t, pts };
 }
 
-function drawSkeleton(ctx, connections, frame, w, h) {
-  ctx.clearRect(0, 0, w, h);
+/**
+ * Con object-fit:contain, el contenido real del video (sin distorsión)
+ * queda centrado dentro de la caja del <video>, con barras negras a los
+ * lados o arriba/abajo si el aspect ratio del clip no coincide con el de
+ * la caja. Los landmarks de MediaPipe estan normalizados (0-1) respecto al
+ * FRAME NATIVO del video, no respecto a la caja completa -- asi que hay
+ * que mapearlos dentro de ese rectangulo interno, no directo contra
+ * canvasW/canvasH, o el esqueleto queda desalineado del corredor (esto es
+ * justo lo que causaba el desfase reportado).
+ */
+export function computeContainRect(canvasW, canvasH, videoW, videoH) {
+  if (!videoW || !videoH) return { x: 0, y: 0, w: canvasW, h: canvasH };
+  const canvasAR = canvasW / canvasH;
+  const videoAR = videoW / videoH;
+  let w, h;
+  if (videoAR > canvasAR) {
+    // el clip es relativamente mas ancho que la caja -> el ancho manda, barras arriba/abajo
+    w = canvasW;
+    h = canvasW / videoAR;
+  } else {
+    // el clip es relativamente mas alto (tipico de video vertical de celular) -> el alto manda, barras a los lados
+    h = canvasH;
+    w = canvasH * videoAR;
+  }
+  return { x: (canvasW - w) / 2, y: (canvasH - h) / 2, w, h };
+}
+
+export function drawSkeleton(ctx, connections, frame, canvasW, canvasH, contentRect) {
+  ctx.clearRect(0, 0, canvasW, canvasH);
   if (!frame) return;
+
+  const { x: ox, y: oy, w, h } = contentRect;
+
+  // Capa oscura semitransparente para que el esqueleto se lea bien sobre
+  // cualquier video, sin taparlo del todo (20% opacidad). Solo sobre el
+  // rectangulo real de contenido, no sobre las barras negras del letterbox.
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+  ctx.fillRect(ox, oy, w, h);
+
   const pts = frame.pts;
   ctx.lineWidth = Math.max(2, w * 0.006);
   ctx.lineCap = 'round';
@@ -37,8 +121,8 @@ function drawSkeleton(ctx, connections, frame, w, h) {
     const pa = pts[a], pb = pts[b];
     if (!pa || !pb) continue;
     ctx.beginPath();
-    ctx.moveTo(pa.x * w, pa.y * h);
-    ctx.lineTo(pb.x * w, pb.y * h);
+    ctx.moveTo(ox + pa.x * w, oy + pa.y * h);
+    ctx.lineTo(ox + pb.x * w, oy + pb.y * h);
     ctx.stroke();
   }
   ctx.fillStyle = 'rgba(255, 221, 51, 0.95)';
@@ -46,7 +130,7 @@ function drawSkeleton(ctx, connections, frame, w, h) {
   for (const key of Object.keys(pts)) {
     const p = pts[key];
     ctx.beginPath();
-    ctx.arc(p.x * w, p.y * h, r, 0, Math.PI * 2);
+    ctx.arc(ox + p.x * w, oy + p.y * h, r, 0, Math.PI * 2);
     ctx.fill();
   }
 }
@@ -82,7 +166,8 @@ export function startSkeletonOverlayLoop(videoElId, canvasElId, getFrames, conne
     const frames = getFrames();
     const ctx = canvas.getContext('2d');
     if (frames && frames.length > 0) {
-      drawSkeleton(ctx, connections, findNearestFrame(frames, video.currentTime), w, h);
+      const contentRect = computeContainRect(w, h, video.videoWidth, video.videoHeight);
+      drawSkeleton(ctx, connections, interpolateFrames(frames, video.currentTime), w, h, contentRect);
     } else {
       ctx.clearRect(0, 0, w, h);
     }

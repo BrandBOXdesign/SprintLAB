@@ -18,12 +18,6 @@ export const DB = {
     localStorage.removeItem(`sl:model:${id}`);
     localStorage.removeItem(`sl:weeklyPlan:${id}`);
     localStorage.removeItem(`sl:dismissed:${id}`);
-    // Estos tres no se borraban antes (quedaban huerfanos en localStorage
-    // tras eliminar un atleta): notas clinicas, fases personalizadas del
-    // macrociclo, y (nuevo) calendario de competencias.
-    localStorage.removeItem(`sl:notes:${id}`);
-    localStorage.removeItem(`sl:customPhases:${id}`);
-    localStorage.removeItem(`sl:competitions:${id}`);
     const ids = DB.getAthleteIds().filter(i => i !== id);
     DB.saveAthleteIds(ids);
   },
@@ -122,14 +116,5 @@ export const DB = {
   },
   saveCustomPhases(athleteId, phases) {
     localStorage.setItem(`sl:customPhases:${athleteId}`, JSON.stringify(phases));
-  },
-  // Fase 6.2 del roadmap: calendario de competencias por atleta, para
-  // conectar el macrociclo con fechas reales de competencia (peaking).
-  getCompetitions(athleteId) {
-    const raw = localStorage.getItem(`sl:competitions:${athleteId}`);
-    try { return raw ? JSON.parse(raw) : []; } catch { return []; }
-  },
-  saveCompetitions(athleteId, list) {
-    localStorage.setItem(`sl:competitions:${athleteId}`, JSON.stringify(list));
   },
 };

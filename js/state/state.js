@@ -45,13 +45,6 @@ export const state = {
   // ---- Fase 4.1: editor visual de fases personalizadas ----
   customPhases: [],
   confirmDeletePhaseId: null,
-  // ---- Fase 6.2: calendario de competencias (peaking) ----
-  competitions: [],
-  confirmDeleteCompetitionId: null,
-  editingResultId: null,       // id de la competencia cuyo formulario de resultado esta abierto
-  competitionResultForm: { time100: '', time200: '', wind100: '', wind200: '', position: '', notes: '' },
-  // ---- Fase 6.3: restaurar desde Backup JSON ----
-  pendingRestore: null,        // { data, isOverwrite, existingName } mientras se confirma la restauracion
   // ---- Ayuda dentro de la app (panel accesible desde el header) ----
   showHelp: false,
   helpSectionId: null,
@@ -75,6 +68,7 @@ export const state = {
     loading: false,
     error: null,
     markerLabelInput: '',
+    playbackRate: 1, // velocidad de reproduccion (1, 0.5, 0.25...) -- se reaplica al <video> en cada render() porque layout.js reconstruye el DOM entero, ver videoInitializer en sessions.js
     strideFreqInput: '',
     strideSerieIndex: '',  // indice de trackSeries elegido para el calculo, si aplica ('' = manual)
     strideManualDist: '',
@@ -85,5 +79,17 @@ export const state = {
     detectingCadenceProgress: 0,
     lastConfidence: null,   // 'baja' | 'media' | 'alta' | null
     cadenceError: null,
+    // Fase A del roadmap de "sprint lab" (analisis de forma de carrera):
+    // captura del esqueleto completo. Ver js/services/poseDetection.js
+    // (analyzeFullSkeleton), js/services/skeletonOverlay.js (dibujo
+    // sincronizado con el video) y actions/video.js#analyzeFullSprint.
+    skeletonFrames: null,          // array de {t, pts} devuelto por analyzeFullSkeleton, o null si no se ha corrido
+    detectingSkeleton: false,
+    detectingSkeletonProgress: 0,
+    skeletonConfidence: null,      // 'baja' | 'media' | 'alta' | null
+    skeletonAnalyzedSeconds: null,
+    skeletonVideoWidth: null,      // dimensiones nativas del video analizado, para el aspect ratio del panel de replay (ver skeletonOverlay.js)
+    skeletonVideoHeight: null,
+    skeletonError: null,
   },
 };

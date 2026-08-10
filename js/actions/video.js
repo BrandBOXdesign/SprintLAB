@@ -8,7 +8,7 @@ import { render } from '../render/layout.js';
 import { state } from '../state/state.js';
 import { calcVelocity } from '../utils/calculations.js';
 import { showToast } from '../utils/notifications.js';
-import { analyzeStrideCadence } from '../services/poseDetection.js';
+import { analyzeFullSkeleton, analyzeStrideCadence } from '../services/poseDetection.js';
 
 function pickSupportedMimeType() {
   const candidates = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm', 'video/mp4'];
@@ -158,9 +158,12 @@ export function releaseVideoPlayback() {
   if (state.videoPlayback.objectUrl) URL.revokeObjectURL(state.videoPlayback.objectUrl);
   state.videoPlayback = {
     sessionId: null, objectUrl: null, loading: false, error: null,
-    markerLabelInput: '', strideFreqInput: '', strideSerieIndex: '',
+    markerLabelInput: '', strideFreqInput: '', strideSerieIndex: '', playbackRate: 1,
     strideManualDist: '', strideManualTime: '',
     detectingCadence: false, detectingCadenceProgress: 0, lastConfidence: null, cadenceError: null,
+    skeletonFrames: null, detectingSkeleton: false, detectingSkeletonProgress: 0,
+    skeletonConfidence: null, skeletonAnalyzedSeconds: null,
+    skeletonVideoWidth: null, skeletonVideoHeight: null, skeletonError: null,
   };
 }
 
@@ -225,7 +228,7 @@ export function saveStrideEstimation(sessionId, { distance, time, strideFrequenc
 // funcionalidad -- ver aviso en la UI.
 export async function detectStrideCadence(sessionId, videoElId) {
   const vp = state.videoPlayback;
-  if (vp.detectingCadence) return; // ya hay un analisis en curso, ignora clics repetidos
+  if (vp.detectingCadence || vp.detectingSkeleton) return; // ya hay un analisis en curso, ignora clics repetidos
   const videoEl = document.getElementById(videoElId);
   if (!videoEl) {
     vp.cadenceError = 'No se encontró el reproductor de video en pantalla.';
@@ -253,5 +256,65 @@ export async function detectStrideCadence(sessionId, videoElId) {
       ' Puedes seguir escribiendo la frecuencia a mano.';
   }
   vp.detectingCadence = false;
+  render();
+}
+
+// Fase A del roadmap de "sprint lab" (analisis de forma de carrera):
+// captura el esqueleto completo del video (cadera, rodillas, tobillos,
+// hombros, codos, muñecas, pies) con MediaPipe Pose -- ver
+// js/services/poseDetection.js#analyzeFullSkeleton. Los resultados quedan
+// en vp.skeletonFrames y de ahi los toma js/services/skeletonOverlay.js
+// para dibujar el "muñeco de palitos" sincronizado sobre el video, sin
+// necesidad de re-analizar cada vez que el entrenador reproduce el clip.
+// Igual que la deteccion de cadencia, requiere internet la primera vez
+// (carga el runtime WASM y el modelo desde CDN); el resto del video es
+// 100% local.
+export async function analyzeFullSprint(sessionId, videoElId) {
+  const vp = state.videoPlayback;
+  if (vp.detectingCadence || vp.detectingSkeleton) return; // ya hay un analisis en curso, ignora clics repetidos
+  const videoEl = document.getElementById(videoElId);
+  if (!videoEl) {
+    vp.skeletonError = 'No se encontró el reproductor de video en pantalla.';
+    render();
+    return;
+  }
+  vp.detectingSkeleton = true;
+  vp.detectingSkeletonProgress = 0;
+  vp.skeletonError = null;
+  render();
+  try {
+    const result = await analyzeFullSkeleton(videoEl, {
+      onProgress: pct => { vp.detectingSkeletonProgress = pct; render(); },
+    });
+    if (!result.frames || result.frames.length === 0) {
+      vp.skeletonFrames = null;
+      vp.skeletonError = 'No se detectó ninguna persona con suficiente claridad en el video analizado.';
+    } else {
+      vp.skeletonFrames = result.frames;
+      vp.skeletonConfidence = result.confidence;
+      vp.skeletonAnalyzedSeconds = result.analyzedSeconds;
+      vp.skeletonVideoWidth = result.videoWidth;
+      vp.skeletonVideoHeight = result.videoHeight;
+      if (result.confidence === 'baja') {
+        showToast('⚠ Detección poco confiable — el esqueleto puede verse errático');
+      } else {
+        showToast(`✓ Esqueleto capturado: ${result.analyzedSeconds}s analizados`);
+      }
+    }
+  } catch (err) {
+    vp.skeletonError = 'No se pudo analizar el video: ' + (err && err.message ? err.message : 'error desconocido.');
+  }
+  vp.detectingSkeleton = false;
+  render();
+}
+
+export function clearSkeletonCapture() {
+  const vp = state.videoPlayback;
+  vp.skeletonFrames = null;
+  vp.skeletonConfidence = null;
+  vp.skeletonAnalyzedSeconds = null;
+  vp.skeletonVideoWidth = null;
+  vp.skeletonVideoHeight = null;
+  vp.skeletonError = null;
   render();
 }

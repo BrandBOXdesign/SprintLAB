@@ -4,8 +4,8 @@ import { DB } from '../db/db.js';
 import { MACRO_MODELS } from '../models/macrocycles.js';
 import { render } from './layout.js';
 import { state } from '../state/state.js';
-import { acuteChronicRatio, calcCustomMacroPosition, calcMacroPosition, daysUntil, getCurrentPhase, getNextCompetition, getPeakingAlert, getPlannedVolume, getRealizedVolume, getVolumeStatus, ratioStatus, sugerirCarga } from '../utils/calculations.js';
-import { COMPETITION_PRIORITY, DAY_COLORS } from '../utils/constants.js';
+import { acuteChronicRatio, calcCustomMacroPosition, calcMacroPosition, getCurrentPhase, getPlannedVolume, getRealizedVolume, getVolumeStatus, ratioStatus, sugerirCarga } from '../utils/calculations.js';
+import { DAY_COLORS } from '../utils/constants.js';
 import { el, emptyState, field, sectionLabel } from '../utils/helpers.js';
 
 // Plantilla neutra usada cuando una fase personalizada no define la suya
@@ -23,23 +23,6 @@ export function renderWeekScreen() {
   }
   const seasonStart = state.athlete && state.athlete.seasonStart;
   const pos = isCustom ? calcCustomMacroPosition(state.customPhases, seasonStart) : calcMacroPosition(m, seasonStart);
-
-  // Fase 6.2: próxima competencia + aviso de peaking (taper) si aplica.
-  const nextComp = getNextCompetition(state.competitions);
-  const peaking = getPeakingAlert(nextComp);
-  let competitionCard = null;
-  if (nextComp) {
-    const days = daysUntil(nextComp.date);
-    const prio = COMPETITION_PRIORITY[nextComp.priority];
-    competitionCard = el('div', { class: 'macro-position-card' }, [
-      el('div', { style: { display: 'flex', alignItems: 'center', gap: '8px' } }, [
-        el('div', { style: { width: '6px', height: '20px', borderRadius: '2px', flexShrink: 0, backgroundColor: prio.color } }),
-        el('div', { class: 'macro-phase' }, nextComp.name),
-      ]),
-      el('div', { class: 'macro-sublabel' }, `${prio.label} · ${days === 0 ? 'hoy' : days === 1 ? 'mañana' : `en ${days} días`}${nextComp.location ? ' · ' + nextComp.location : ''}`),
-      peaking ? el('div', { class: `alert-box ${peaking.days <= 7 ? 'high' : 'low'}`, style: { marginTop: '8px' } }, [el('span', { class: 'icon' }, '🎯'), el('span', {}, peaking.msg)]) : null,
-    ]);
-  }
   let positionNode;
   if (!seasonStart) positionNode = el('div', { class: 'macro-no-start' }, 'Agrega la fecha de inicio de temporada en Perfil para ver en qué semana del macrociclo está este atleta.');
   else if (pos && pos.finished) positionNode = el('div', { class: 'macro-position-card' }, [el('div', { class: 'macro-phase' }, 'Temporada completada'), el('div', { class: 'macro-sublabel' }, 'Han pasado ' + pos.week + ' semanas desde el inicio. Inicia una nueva temporada actualizando la fecha en Perfil.')]);
@@ -109,9 +92,7 @@ export function renderWeekScreen() {
       el('div', { style: { width: '90px', flexShrink: 0 } }, typeSelect),
     ]);
   }));
-  const children = [];
-  if (competitionCard) children.push(sectionLabel('—', 'Próxima competencia'), competitionCard);
-  children.push(sectionLabel('—', 'Posición en temporada'), positionNode, sectionLabel('—', 'Carga semanal'), loadSummary, alertNode, suggestionCard, sectionLabel('—', 'Microciclo · ' + m.name), el('p', { class: 'helper-text' }, 'Edita contenido, tipo y duración planificada. Los cambios se guardan automáticamente.'), weekTrack, el('button', { class: 'primary-button', style: { marginTop: '12px' }, onClick: autoAdjustWeek }, 'Ajustar semana automáticamente'));
+  const children = [sectionLabel('—', 'Posición en temporada'), positionNode, sectionLabel('—', 'Carga semanal'), loadSummary, alertNode, suggestionCard, sectionLabel('—', 'Microciclo · ' + m.name), el('p', { class: 'helper-text' }, 'Edita contenido, tipo y duración planificada. Los cambios se guardan automáticamente.'), weekTrack, el('button', { class: 'primary-button', style: { marginTop: '12px' }, onClick: autoAdjustWeek }, 'Ajustar semana automáticamente')];
   if (state.model === 'annual') children.push(el('div', { class: 'field-note' }, [el('div', { class: 'field-note-title' }, 'Sábado de campo — dos sub-bloques'), el('div', { class: 'field-note-row' }, [el('span', { class: 'field-note-tag' }, 'CARGA'), el('span', {}, '30 vueltas de 200m en arena + saltos + arrancones de 60m')]), el('div', { class: 'field-note-row' }, [el('span', { class: 'field-note-tag discharge' }, 'DESCARGA'), el('span', {}, 'Sprints explosivos y saltos en agua media (cierre de sesión)')])]));
   children.push(sectionLabel('—', 'Fases del macrociclo'), el('div', { class: 'phase-list' }, m.phases.map((p, i) => { const isActive = pos && p.name === pos.phase; return el('div', { class: 'phase-row', style: isActive ? { borderLeft: '2px solid #C8332A', paddingLeft: '10px', marginLeft: '-12px' } : {} }, [el('div', { class: 'phase-duration', style: isActive ? { color: '#C8332A' } : {} }, p.months ? p.months + ' mes' + (p.months > 1 ? 'es' : '') : p.weeks + ' sem.'), el('div', {}, [el('div', { class: 'phase-name', style: isActive ? { color: '#F2EFE9' } : {} }, p.name + (isActive ? ' ←' : '')), el('div', { class: 'phase-note' }, p.note)])]); })));
   return el('div', { class: 'screen' }, children);

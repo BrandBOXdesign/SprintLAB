@@ -7,11 +7,3 @@ export const EXERCISE_COLORS = ['#C8332A', '#D9A441', '#5A8F5A', '#3A7BD5', '#9B
 
 export const VALIDATION_RULES = { duration: { min: 1, max: 480, warnMax: 300 }, time100: { min: 9.5, max: 18.0 }, time200: { min: 19.0, max: 36.0 }, reaction: { min: 0.1, max: 0.5 }, start: { min: 0.1, max: 1.0 }, gymWeight: { min: 1, max: 300 }, gymReps: { min: 1, max: 36 } };
 
-// Fase 6.2: prioridad de competencia — compartida entre el editor de
-// competencias (Perfil) y la tarjeta de "próxima competencia" (Semana).
-export const COMPETITION_PRIORITY = {
-  A: { label: 'A · Objetivo principal', color: 'var(--red)' },
-  B: { label: 'B · Importante', color: 'var(--gold)' },
-  C: { label: 'C · Preparación', color: 'var(--muted)' },
-};
-

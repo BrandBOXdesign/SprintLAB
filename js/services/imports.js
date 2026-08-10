@@ -1,5 +1,4 @@
 // Auto-generado a partir de index_-_copia.html durante la modularizacion (2026-07-04)
-import { loadAll, selectAthlete } from '../actions/athletes.js';
 import { DB } from '../db/db.js';
 import { render } from '../render/layout.js';
 import { state } from '../state/state.js';
@@ -7,91 +6,6 @@ import { avg1RM, estimatePower, estimateVelocity } from '../utils/calculations.j
 import { todayISO } from '../utils/helpers.js';
 
 import { showToast } from '../utils/notifications.js';
-
-// ------------------------------------------------------------------
-// Restaurar desde Backup JSON (la mitad que faltaba: exportProfileJSON()
-// en exports.js genera el archivo, pero hasta ahora no habia manera de
-// volver a cargarlo -- un backup que no se puede restaurar no protege
-// nada). Es una operacion potencialmente destructiva (puede sobrescribir
-// a un atleta existente), asi que pide confirmacion con el modal propio
-// de la app antes de tocar nada en DB.
-// ------------------------------------------------------------------
-export function importBackupJSON(file) {
-  const reader = new FileReader();
-  reader.onload = (e) => {
-    let data;
-    try { data = JSON.parse(e.target.result); }
-    catch { showToast('El archivo no es JSON válido.'); return; }
-
-    // El respaldo automático (services/autoBackup.js) guarda TODOS los
-    // atletas juntos en un solo archivo (data.athletes: [...]), a
-    // diferencia del backup manual de exportProfileJSON (un solo atleta,
-    // data.athlete). Se detecta la forma y se restaura como corresponda.
-    if (data && Array.isArray(data.athletes)) {
-      const validEntries = data.athletes.filter(a => a && a.athlete && a.athlete.id && Array.isArray(a.sessions));
-      if (!validEntries.length) { showToast('Este archivo no parece un respaldo automático de Sprint Lab.'); return; }
-      const existingIds = DB.getAthleteIds();
-      const overwriteNames = validEntries.filter(a => existingIds.includes(a.athlete.id)).map(a => a.athlete.name);
-      state.pendingRestore = { isMulti: true, entries: validEntries, isOverwrite: overwriteNames.length > 0, overwriteNames };
-      render();
-      return;
-    }
-
-    if (!data || typeof data !== 'object' || !data.athlete || !data.athlete.id || !Array.isArray(data.sessions)) {
-      showToast('Este archivo no parece un Backup JSON de Sprint Lab.');
-      return;
-    }
-    const existingIds = DB.getAthleteIds();
-    const isOverwrite = existingIds.includes(data.athlete.id);
-    const existingAthlete = isOverwrite ? DB.getAthlete(data.athlete.id) : null;
-    state.pendingRestore = { isMulti: false, data, isOverwrite, existingName: existingAthlete ? existingAthlete.name : null };
-    render();
-  };
-  reader.readAsText(file);
-}
-
-function restoreOneAthlete(entry) {
-  const id = entry.athlete.id;
-  DB.saveAthlete(id, entry.athlete);
-  DB.saveSessions(id, entry.sessions || []);
-  if (entry.model) DB.saveModel(id, entry.model);
-  if (entry.clinicalNotes) DB.saveClinicalNotes(id, entry.clinicalNotes);
-  if (entry.weeklyPlan) DB.saveWeeklyPlan(id, entry.weeklyPlan);
-  if (entry.customPhases) DB.saveCustomPhases(id, entry.customPhases);
-  if (entry.competitions) DB.saveCompetitions(id, entry.competitions);
-  return id;
-}
-
-export function confirmRestoreBackup() {
-  const pending = state.pendingRestore;
-  if (!pending) return;
-
-  if (pending.isMulti) {
-    const ids = DB.getAthleteIds();
-    for (const entry of pending.entries) {
-      const id = restoreOneAthlete(entry);
-      if (!ids.includes(id)) ids.push(id);
-    }
-    DB.saveAthleteIds(ids);
-    state.pendingRestore = null;
-    showToast(`Se restauraron ${pending.entries.length} atleta${pending.entries.length === 1 ? '' : 's'}`);
-    loadAll(); // recarga la lista completa y vuelve a la pantalla de Atletas
-    return;
-  }
-
-  const { data } = pending;
-  const id = restoreOneAthlete(data);
-  const ids = DB.getAthleteIds();
-  if (!ids.includes(id)) { ids.push(id); DB.saveAthleteIds(ids); }
-  state.pendingRestore = null;
-  showToast(pending.isOverwrite ? 'Atleta restaurado (datos anteriores reemplazados)' : 'Atleta restaurado como nuevo');
-  selectAthlete(id); // recarga todo el estado desde DB, igual que al abrir un atleta
-}
-
-export function cancelRestoreBackup() {
-  state.pendingRestore = null;
-  render();
-}
 
 export function importCSV(file) {
   const reader = new FileReader();

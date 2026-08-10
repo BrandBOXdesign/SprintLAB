@@ -18,8 +18,6 @@ export function selectAthlete(id) {
   state.sessions = DB.getSessions(id);
   state.model = DB.getModel(id);
   state.customPhases = DB.getCustomPhases(id);
-  state.competitions = DB.getCompetitions(id);
-  state.editingResultId = null;
   state.profileForm = { ...state.athlete, target100: state.athlete?.target100 || '', target200: state.athlete?.target200 || '' };
   let plan = DB.getWeeklyPlan(id);
   if (!plan && state.model === 'custom') {

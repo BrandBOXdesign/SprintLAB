@@ -1,13 +1,15 @@
 // Auto-generado a partir de index_-_copia.html durante la modularizacion (2026-07-04)
 import { addSessionToCurrentAthlete, cancelDeleteSession, confirmDeleteSession, executeDeleteSession } from '../actions/sessions.js';
 import {
-  addVideoMarker, cancelVideoRecording, deleteSessionVideo, deleteVideoMarker,
+  addVideoMarker, analyzeFullSprint, cancelVideoRecording, clearSkeletonCapture, deleteSessionVideo, deleteVideoMarker,
   detectStrideCadence, loadVideoForPlayback, saveStrideEstimation, startVideoRecording,
   stopVideoRecording, uploadVideoFile,
 } from '../actions/video.js';
 import { renderGpxMap } from '../charts/gpxMap.js';
 import { renderGpxVelocityChart } from '../charts/velocityChart.js';
 import { render } from './layout.js';
+import { SKELETON_CONNECTIONS } from '../services/poseDetection.js';
+import { startSkeletonOverlayLoop } from '../services/skeletonOverlay.js';
 import { state } from '../state/state.js';
 import { avg1RM, calcVelocity, estimatePower, estimateVelocity, registrationGapDays, validateLogForm, validateNum } from '../utils/calculations.js';
 import { DAY_COLORS } from '../utils/constants.js';
@@ -75,10 +77,47 @@ function renderVideoBlock(s, videoInitializers) {
     return el('div', { class: 'video-block' }, [el('div', { class: 'video-loading' }, 'Cargando video…')]);
   }
 
+  const busy = vp.detectingCadence || vp.detectingSkeleton;
   const videoElId = `video-player-${s.id}`;
+  const canvasElId = `skeleton-canvas-${s.id}`;
   const videoEl = el('video', { id: videoElId, class: 'video-player', controls: true, src: vp.objectUrl, playsinline: true });
-  const markerLabelInput = el('input', { value: vp.markerLabelInput, placeholder: 'Etiqueta (ej. contacto de pie)', disabled: vp.detectingCadence, oninput: e => { vp.markerLabelInput = e.target.value; } });
-  const markBtn = el('button', { class: 'secondary-button', disabled: vp.detectingCadence, onClick: () => {
+  const skeletonCanvas = el('canvas', { id: canvasElId, class: 'skeleton-overlay' });
+  // El loop de dibujo se auto-administra (ver skeletonOverlay.js): se puede
+  // pedir arrancar en cada render() sin miedo a duplicar, y se cierra solo
+  // cuando el canvas deja de existir (otra sesion, video borrado, etc.).
+  videoInitializers.push(() => startSkeletonOverlayLoop(
+    videoElId, canvasElId,
+    () => (state.videoPlayback.sessionId === s.id ? state.videoPlayback.skeletonFrames : null),
+    SKELETON_CONNECTIONS,
+  ));
+  // render() reconstruye el <video> desde cero en cada llamada, asi que el
+  // playbackRate se resetea a 1 solo con que el usuario escriba en
+  // cualquier campo de la pantalla -- por eso se reaplica aca en cada
+  // render, igual que el resto de los "initializers" de este bloque.
+  videoInitializers.push(() => {
+    const v = document.getElementById(videoElId);
+    if (v) v.playbackRate = state.videoPlayback.sessionId === s.id ? state.videoPlayback.playbackRate : 1;
+  });
+  // Camara lenta: no mejora la precision del tracking (los datos son los
+  // mismos), pero SI reduce cuanto "saltan" a la vista los errores que
+  // queden -- un mismo desplazamiento estirado en mas tiempo real se
+  // percibe como un movimiento fluido en vez de un salto brusco.
+  const speedOptions = [1, 0.5, 0.25, 0.1];
+  const speedButtons = el('div', { class: 'video-speed-row' }, [
+    el('span', { class: 'video-speed-label' }, 'Velocidad:'),
+    ...speedOptions.map(rate => el('button', {
+      class: 'speed-btn' + (vp.playbackRate === rate ? ' speed-btn-active' : ''),
+      disabled: busy,
+      onClick: () => {
+        vp.playbackRate = rate;
+        const v = document.getElementById(videoElId);
+        if (v) v.playbackRate = rate;
+        render();
+      },
+    }, rate === 1 ? '1x' : `${rate}x`)),
+  ]);
+  const markerLabelInput = el('input', { value: vp.markerLabelInput, placeholder: 'Etiqueta (ej. contacto de pie)', disabled: busy, oninput: e => { vp.markerLabelInput = e.target.value; } });
+  const markBtn = el('button', { class: 'secondary-button', disabled: busy, onClick: () => {
     const v = document.getElementById(videoElId);
     const t = v ? v.currentTime : NaN;
     if (isNaN(t)) return;
@@ -87,19 +126,21 @@ function renderVideoBlock(s, videoInitializers) {
   } }, '📍 Marcar');
   const markers = Array.isArray(s.videoMarkers) ? s.videoMarkers : [];
   const markersList = markers.length === 0 ? null : el('div', { class: 'video-markers' }, markers.map(m => el('div', { class: 'marker-row' }, [
-    el('button', { class: 'marker-jump', title: 'Ir a este momento', disabled: vp.detectingCadence, onClick: () => { const v = document.getElementById(videoElId); if (v) { v.currentTime = m.time; v.pause(); } } }, `⏱ ${m.time.toFixed(2)}s`),
+    el('button', { class: 'marker-jump', title: 'Ir a este momento', disabled: busy, onClick: () => { const v = document.getElementById(videoElId); if (v) { v.currentTime = m.time; v.pause(); } } }, `⏱ ${m.time.toFixed(2)}s`),
     el('span', { class: 'marker-label' }, m.label),
-    el('button', { class: 'marker-delete', title: 'Eliminar marca', disabled: vp.detectingCadence, onClick: () => deleteVideoMarker(s.id, m.id) }, '✕'),
+    el('button', { class: 'marker-delete', title: 'Eliminar marca', disabled: busy, onClick: () => deleteVideoMarker(s.id, m.id) }, '✕'),
   ])));
 
   return el('div', { class: 'video-block' }, [
     el('div', { class: 'video-player-wrap' }, [
-      videoEl,
+      el('div', { class: 'video-canvas-stack' }, [videoEl, skeletonCanvas]),
+      speedButtons,
       el('div', { class: 'video-marker-form' }, [markerLabelInput, markBtn]),
       markersList,
-      el('button', { class: 'danger-button', style: { marginTop: '8px' }, disabled: vp.detectingCadence, onClick: () => deleteSessionVideo(s.id) }, '🗑 Eliminar video'),
+      el('button', { class: 'danger-button', style: { marginTop: '8px' }, disabled: busy, onClick: () => deleteSessionVideo(s.id) }, '🗑 Eliminar video'),
     ]),
     renderStrideEstimator(s, videoElId),
+    renderSkeletonCapture(s, videoElId),
   ]);
 }
 
@@ -120,16 +161,17 @@ function renderStrideEstimator(s, videoElId) {
   ]) : null;
   if (serieSelect) serieSelect.value = vp.strideSerieIndex;
 
+  const busy = vp.detectingCadence || vp.detectingSkeleton;
   const distInput = decimalInput({ value: vp.strideManualDist, placeholder: 'Distancia (m)', disabled: !useManual, oninput: e => { vp.strideManualDist = e.target.value; } });
   const timeInput = decimalInput({ value: vp.strideManualTime, placeholder: 'Tiempo (s)', disabled: !useManual, oninput: e => { vp.strideManualTime = e.target.value; } });
-  const freqInput = decimalInput({ value: vp.strideFreqInput, placeholder: 'Zancadas/seg', disabled: vp.detectingCadence, oninput: e => { vp.strideFreqInput = e.target.value; } });
+  const freqInput = decimalInput({ value: vp.strideFreqInput, placeholder: 'Zancadas/seg', disabled: busy, oninput: e => { vp.strideFreqInput = e.target.value; } });
 
   // Deteccion automatica con MediaPipe Pose (ver services/poseDetection.js).
   // Solo rellena freqInput -- el entrenador confirma con el boton de abajo.
   const detectBtn = el('button', {
-    class: 'secondary-button', disabled: vp.detectingCadence || !vp.objectUrl,
+    class: 'secondary-button', disabled: busy || !vp.objectUrl,
     onClick: () => detectStrideCadence(s.id, videoElId),
-  }, vp.detectingCadence ? 'Analizando…' : 'Detectar automáticamente');
+  }, vp.detectingCadence ? 'Analizando…' : '🤖 Detectar automáticamente');
 
   const progressNode = vp.detectingCadence ? el('div', { class: 'cadence-progress' }, [
     el('div', { class: 'cadence-progress-track' }, [el('div', { class: 'cadence-progress-fill', style: { width: vp.detectingCadenceProgress + '%' } })]),
@@ -146,7 +188,7 @@ function renderStrideEstimator(s, videoElId) {
 
   const cadenceErrorNode = vp.cadenceError && !vp.detectingCadence ? el('div', { class: 'video-error' }, '⚠ ' + vp.cadenceError) : null;
 
-  const calcBtn = el('button', { class: 'secondary-button', disabled: vp.detectingCadence, onClick: () => {
+  const calcBtn = el('button', { class: 'secondary-button', disabled: busy, onClick: () => {
     let distance, time;
     if (!useManual) { const serie = s.trackSeries[Number(vp.strideSerieIndex)]; distance = serie.dist; time = serie.time; }
     else { distance = vp.strideManualDist; time = vp.strideManualTime; }
@@ -171,6 +213,55 @@ function renderStrideEstimator(s, videoElId) {
       'La detección automática analiza como máximo los primeros 15 segundos del video y funciona mejor con una toma lateral del corredor, buena resolución y sin que nadie lo tape. Es un punto de partida, no una medición exacta — siempre revisa el número antes de calcular. Requiere internet la primera vez que se usa (descarga el modelo de análisis).'),
     calcBtn,
     resultNode,
+  ].filter(Boolean));
+}
+
+// Fase A del roadmap de "sprint lab" (analisis de forma de carrera): panel
+// para disparar analyzeFullSprint() y mostrar su estado. El resultado en si
+// (el muñeco de palitos) no se dibuja aqui -- eso lo hace el loop de
+// skeletonOverlay.js sobre el <canvas> que ya se agrego junto al <video> en
+// renderVideoBlock(). Este panel solo controla cuándo correr el análisis y
+// muestra confianza/errores, igual que el patrón ya usado para cadencia.
+function renderSkeletonCapture(s, videoElId) {
+  const vp = state.videoPlayback;
+  const busy = vp.detectingCadence || vp.detectingSkeleton;
+  const hasFrames = Array.isArray(vp.skeletonFrames) && vp.skeletonFrames.length > 0;
+
+  const captureBtn = el('button', {
+    class: 'secondary-button', disabled: busy || !vp.objectUrl,
+    onClick: () => analyzeFullSprint(s.id, videoElId),
+  }, vp.detectingSkeleton ? 'Analizando…' : (hasFrames ? '🦴 Volver a capturar esqueleto' : '🦴 Capturar esqueleto completo'));
+
+  const clearBtn = hasFrames ? el('button', { class: 'secondary-button', disabled: busy, onClick: () => clearSkeletonCapture() }, '🗑 Quitar esqueleto') : null;
+
+  const progressNode = vp.detectingSkeleton ? el('div', { class: 'cadence-progress' }, [
+    el('div', { class: 'cadence-progress-track' }, [el('div', { class: 'cadence-progress-fill', style: { width: vp.detectingSkeletonProgress + '%' } })]),
+    el('span', { class: 'cadence-progress-label' }, `Capturando esqueleto… ${vp.detectingSkeletonProgress}%`),
+  ]) : null;
+
+  const confidenceBadge = (!vp.detectingSkeleton && hasFrames && vp.skeletonConfidence) ? el('div', { class: `confidence-badge confidence-${vp.skeletonConfidence}` },
+    vp.skeletonConfidence === 'baja'
+      ? '⚠ Confianza baja — el esqueleto puede saltar o desalinearse'
+      : vp.skeletonConfidence === 'media'
+        ? '● Confianza media — revisa visualmente antes de sacar conclusiones'
+        : '✓ Confianza alta',
+  ) : null;
+
+  const errorNode = vp.skeletonError && !vp.detectingSkeleton ? el('div', { class: 'video-error' }, '⚠ ' + vp.skeletonError) : null;
+
+  const resultNode = (!vp.detectingSkeleton && hasFrames) ? el('div', { class: 'calc-hint' },
+    `Esqueleto capturado sobre ${vp.skeletonAnalyzedSeconds}s de video — dale play arriba para ver la animación superpuesta.`,
+  ) : null;
+
+  return el('div', { class: 'stride-calc-box' }, [
+    el('div', { class: 'series-block-title' }, 'Esqueleto completo (Fase A — solo visual, sin calificación)'),
+    el('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center', marginBottom: '6px' } }, [captureBtn, clearBtn].filter(Boolean)),
+    progressNode,
+    confidenceBadge,
+    errorNode,
+    resultNode,
+    el('p', { class: 'help-p', style: { marginTop: '2px', marginBottom: '4px', fontSize: '11.5px' } },
+      'Rastrea cadera, rodillas, tobillos, hombros, codos, muñecas y pies (los mismos 15 segundos máximo que la detección de cadencia). Dibuja un muñeco de palitos sincronizado con la reproducción del video, sobre una capa oscura semitransparente para que se lea bien. Todavía no da ángulos ni calificaciones de técnica — eso vendría en una fase posterior. Requiere internet la primera vez que se usa.'),
   ].filter(Boolean));
 }
 

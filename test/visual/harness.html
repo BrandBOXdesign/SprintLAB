@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<!--
+  Arnes minimo de verificacion visual -- NO es parte de la app, no se
+  incluye en el build de Electron. Sirve solo para que scripts/verify-
+  skeleton.mjs (Playwright) pueda cargar un video real, correr el analisis
+  de esqueleto EXACTO de la app (mismo poseDetection.js/skeletonOverlay.js,
+  sin duplicar logica) y sacar capturas de pantalla del canvas en
+  instantes especificos, para que Claude pueda revisarlas visualmente en
+  vez de razonar a ciegas sobre el codigo.
+
+  Uso: no se abre a mano -- lo abre Playwright con un ?video=<ruta o URL>
+  en la query string. Ver scripts/verify-skeleton.mjs.
+-->
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Arnes de verificacion visual -- Sprint Lab</title>
+<style>
+  body { margin: 0; background: #10141a; }
+  #stack { position: relative; width: 640px; }
+  video, canvas { display: block; width: 640px; }
+  canvas { position: absolute; top: 0; left: 0; }
+  #status { position: fixed; bottom: 0; left: 0; right: 0; color: #0f0; font: 12px monospace; background: #000; padding: 4px; white-space: pre-wrap; }
+</style>
+</head>
+<body>
+  <div id="stack">
+    <video id="v" muted playsinline></video>
+    <canvas id="c"></canvas>
+  </div>
+  <div id="status">esperando...</div>
+
+<script type="module">
+import { analyzeFullSkeleton } from '../../js/services/poseDetection.js';
+import { computeContainRect, drawSkeleton, interpolateFrames } from '../../js/services/skeletonOverlay.js';
+import { SKELETON_CONNECTIONS } from '../../js/services/poseDetection.js';
+
+const statusEl = document.getElementById('status');
+const log = (msg) => { statusEl.textContent = msg; console.log('[arnes]', msg); };
+
+const params = new URLSearchParams(location.search);
+const videoUrl = params.get('video');
+if (!videoUrl) { log('ERROR: falta ?video=<ruta o URL> en la query string'); throw new Error('sin video'); }
+
+const video = document.getElementById('v');
+const canvas = document.getElementById('c');
+
+// Se expone en window para que Playwright pueda llamarlas directo via
+// page.evaluate() -- asi el script de Node controla el timing (esperar a
+// que cargue metadata, esperar a que termine el analisis, etc.) en vez de
+// que este arnes intente adivinarlo con timeouts fijos.
+window.__harness = {
+  status: 'idle',
+  frames: null,
+  error: null,
+
+  async loadVideo() {
+    return new Promise((resolve, reject) => {
+      video.addEventListener('loadedmetadata', () => resolve({
+        duration: video.duration, videoWidth: video.videoWidth, videoHeight: video.videoHeight,
+      }), { once: true });
+      video.addEventListener('error', () => reject(new Error('video no pudo cargar: ' + videoUrl)), { once: true });
+      video.src = videoUrl;
+    });
+  },
+
+  async runAnalysis() {
+    window.__harness.status = 'analizando';
+    log('corriendo analyzeFullSkeleton (modelo heavy, puede tardar)...');
+    try {
+      const result = await analyzeFullSkeleton(video, {
+        onProgress: pct => log(`analizando... ${pct}%`),
+      });
+      window.__harness.frames = result.frames;
+      window.__harness.status = 'listo';
+      log(`listo: ${result.frames.length} cuadros, confianza=${result.confidence}, detectionRate=${result.detectionRate}`);
+      return { frameCount: result.frames.length, confidence: result.confidence, detectionRate: result.detectionRate, analyzedSeconds: result.analyzedSeconds };
+    } catch (err) {
+      window.__harness.status = 'error';
+      window.__harness.error = String(err && err.stack || err);
+      log('ERROR en analisis: ' + window.__harness.error);
+      throw err;
+    }
+  },
+
+  /** Dibuja el esqueleto en el instante t (segundos) de forma SINCRONA y determinista -- sin depender del loop de rAF en vivo, para que Playwright pueda capturar exactamente ese cuadro. */
+  async drawAt(t) {
+    return new Promise((resolve, reject) => {
+      const onSeeked = () => {
+        video.removeEventListener('seeked', onSeeked);
+        try {
+          const rect = video.getBoundingClientRect();
+          canvas.width = Math.round(rect.width);
+          canvas.height = Math.round(rect.height);
+          const ctx = canvas.getContext('2d');
+          const frames = window.__harness.frames;
+          if (frames && frames.length > 0) {
+            const contentRect = computeContainRect(canvas.width, canvas.height, video.videoWidth, video.videoHeight);
+            drawSkeleton(ctx, SKELETON_CONNECTIONS, interpolateFrames(frames, t), canvas.width, canvas.height, contentRect);
+          } else {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+          }
+          resolve();
+        } catch (err) { reject(err); }
+      };
+      video.addEventListener('seeked', onSeeked);
+      video.currentTime = t;
+    });
+  },
+};
+
+log('arnes listo, esperando comandos de Playwright');
+</script>
+</body>
+</html>
