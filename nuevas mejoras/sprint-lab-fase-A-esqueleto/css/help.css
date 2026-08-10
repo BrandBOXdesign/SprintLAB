@@ -1,0 +1,50 @@
+/* Panel de ayuda (ver js/render/help.js). Reutiliza .chart-tabs/.chart-tab
+   (charts.css) para el índice de secciones, y variables de color ya
+   definidas en variables.css para quedar consistente con el resto de la app. */
+
+.header-actions { display: flex; align-items: center; gap: 8px; }
+
+.header-help-btn {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  width: 36px;
+  height: 36px;
+  font-size: 15px;
+  color: var(--text2);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.header-help-btn:hover { border-color: var(--gold); color: var(--gold); }
+
+.help-screen { padding-top: 4px; }
+.help-tabs { margin-top: 4px; margin-bottom: 16px; }
+
+.help-content { display: flex; flex-direction: column; gap: 4px; }
+
+.help-h { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; color: var(--gold); margin: 18px 0 4px; }
+.help-h:first-child { margin-top: 0; }
+
+.help-p { font-size: 13.5px; line-height: 1.55; color: var(--text2); margin: 0 0 10px; }
+
+.help-list { margin: 0 0 10px; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; }
+.help-list li { font-size: 13.5px; line-height: 1.5; color: var(--text2); }
+
+.help-note {
+  display: flex; gap: 8px; align-items: flex-start;
+  font-size: 13px; line-height: 1.5; color: var(--text2);
+  background: rgba(217,164,65,0.08); border: 1px solid rgba(217,164,65,0.3);
+  border-radius: 6px; padding: 10px 12px; margin: 4px 0 14px;
+}
+.help-note-icon { flex-shrink: 0; color: var(--gold); }
+.help-note-warn { background: rgba(200,51,42,0.08); border-color: rgba(200,51,42,0.3); }
+.help-note-warn .help-note-icon { color: var(--red); }
+
+.help-figure { margin: 8px 0 16px; }
+.help-screenshot { width: 100%; border-radius: 6px; border: 1px solid var(--border); display: block; }
+.help-screenshot-placeholder {
+  width: 100%; min-height: 140px; border-radius: 6px; border: 1px dashed var(--border);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+  color: var(--muted); font-size: 12px; text-align: center; padding: 16px;
+}
+.help-caption { font-size: 11.5px; color: var(--muted); margin-top: 6px; text-align: center; }

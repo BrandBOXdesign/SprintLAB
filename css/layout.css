@@ -1,0 +1,29 @@
+/* Auto-generado a partir de index_-_copia.html durante la modularizacion (2026-07-04) */
+  header.app-header { padding: 20px 20px 16px; }
+  .header-lane { height: 2px; background: var(--border); }
+  .header-content { padding: 14px 0; display: flex; align-items: center; justify-content: space-between; }
+  .header-titles { }
+  .header-eyebrow { font-size: 11px; letter-spacing: 3px; color: var(--gold); font-weight: 700; }
+  .header-title { font-size: 30px; font-weight: 800; letter-spacing: 1px; margin: 4px 0 0; font-family: 'Arial Narrow', Arial, sans-serif; }
+  .header-athlete-btn { background: var(--card); border: 1px solid var(--border); border-radius: 6px; padding: 8px 14px; color: var(--text); font-size: 12px; font-weight: 600; cursor: pointer; text-align: right; max-width: 140px; }
+  .header-athlete-name { color: var(--gold); font-size: 13px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .header-athlete-label { color: var(--muted); font-size: 10px; letter-spacing: 0.5px; margin-top: 2px; }
+  .error-banner { background: rgba(200,51,42,0.15); border: 1px solid var(--red); color: var(--text); padding: 10px 16px; margin: 0 20px 12px; border-radius: 4px; font-size: 13px; display: flex; justify-content: space-between; align-items: center; }
+  .error-dismiss { background: none; border: none; color: var(--text); cursor: pointer; font-size: 14px; }
+  .section-label { display: flex; align-items: center; gap: 10px; margin: 24px 0 14px; }
+  .section-label:first-child { margin-top: 0; }
+  .section-number { font-size: 11px; color: var(--gold); font-weight: 700; letter-spacing: 1px; }
+  .section-title { font-size: 13px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: var(--text); }
+  .section-rule { flex: 1; height: 1px; background: var(--border); }
+  nav.tab-bar { position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 480px; display: flex; background: #0E0D0B; border-top: 1px solid var(--border); }
+  .tab-button { flex: 1; background: none; border: none; padding: 14px 0 12px; font-size: 12px; font-weight: 600; letter-spacing: 0.5px; cursor: pointer; color: var(--muted); border-top: 2px solid transparent; }
+  .tab-button.active { color: var(--red); border-top: 2px solid var(--red); }
+  .notification-banner { background: var(--card); border-bottom: 2px solid var(--border); padding: 8px 16px; display: flex; flex-direction: column; gap: 4px; }
+  .notification-item { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 10px; border-radius: 4px; font-size: 13px; background: rgba(58,55,51,0.3); }
+  .notification-item .msg { flex: 1; }
+  .notification-item .dismiss { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 16px; padding: 0 4px; }
+  .notification-item .dismiss:hover { color: var(--text); }
+  .notification-item.info { border-left: 3px solid var(--gold); }
+  .notification-item.warning { border-left: 3px solid var(--gold); background: rgba(217,164,65,0.08); }
+  .notification-item.danger { border-left: 3px solid var(--red); background: rgba(200,51,42,0.08); }
+  .notification-item.success { border-left: 3px solid var(--green); background: rgba(90,143,90,0.08); }

@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Verificación eje Y — MediaPipe Pose (Sprint Lab)</title>
+<style>
+  body { background: #0E0D0B; color: #F2EFE9; font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 20px; }
+  h1 { font-size: 18px; margin-bottom: 4px; }
+  .sub { color: #8A857C; font-size: 13px; margin-bottom: 20px; }
+  .panel { background: #17150F; border: 1px solid #3A3733; border-radius: 8px; padding: 16px; margin-bottom: 16px; }
+  .row { display: flex; gap: 16px; flex-wrap: wrap; }
+  .col { flex: 1; min-width: 320px; }
+  button { background: #C8332A; color: #fff; border: none; padding: 10px 16px; border-radius: 6px; cursor: pointer; font-size: 14px; margin-right: 8px; }
+  button:disabled { background: #3A3733; color: #8A857C; cursor: not-allowed; }
+  button.secondary { background: #3A3733; }
+  input[type=file] { color: #F2EFE9; }
+  #videoWrap { position: relative; display: inline-block; max-width: 100%; }
+  video { max-width: 100%; display: block; background: #000; }
+  canvas#overlay { position: absolute; top: 0; left: 0; pointer-events: none; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 10px; }
+  th, td { text-align: left; padding: 5px 8px; border-bottom: 1px solid #3A3733; }
+  th { color: #8A857C; font-weight: normal; }
+  .verdict { font-size: 15px; font-weight: bold; padding: 12px; border-radius: 6px; margin-top: 10px; }
+  .verdict.pending { background: rgba(217,164,65,0.12); border: 1px solid #D9A441; color: #D9A441; }
+  .verdict.up { background: rgba(90,143,90,0.12); border: 1px solid #5A8F5A; color: #5A8F5A; }
+  .verdict.down { background: rgba(200,51,42,0.12); border: 1px solid #C8332A; color: #C8332A; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; margin-left: 6px; }
+  .badge.L { background: #3A7BD5; }
+  .badge.R { background: #D9A441; }
+  code { background: #0E0D0B; padding: 1px 5px; border-radius: 3px; }
+  #status { color: #8A857C; font-size: 13px; margin-top: 8px; }
+</style>
+</head>
+<body>
+
+<h1>Verificación del eje Y — MediaPipe Pose (Sprint Lab)</h1>
+<div class="sub">
+  Herramienta aislada, no toca el código de la app. Usa exactamente la misma versión de MediaPipe
+  (<code>@mediapipe/tasks-vision@0.10.35</code>) y el mismo modelo (<code>pose_landmarker_lite</code>, <code>runningMode: VIDEO</code>)
+  que <code>poseDetection.js</code> en producción, para que el resultado sea representativo de lo que vería la app real.
+</div>
+
+<div class="panel">
+  <strong>Paso 1.</strong> Elige un video corto donde el atleta esté claramente <u>de pie, erguido</u> en algún momento
+  (al inicio antes de arrancar, por ejemplo). No hace falta que sea largo.
+  <br><br>
+  <input type="file" id="fileInput" accept="video/*">
+  <div id="status">Esperando video…</div>
+</div>
+
+<div class="panel" id="playerPanel" style="display:none;">
+  <strong>Paso 2.</strong> Elige la variante del modelo, cárgala, pausa el video en el cuadro exacto que quieras
+  evaluar (no lo muevas entre pruebas — así comparas manzanas con manzanas) y pulsa "Analizar este cuadro".
+  Puedes repetir con otra variante <u>sin mover el video</u> y comparar en la tabla de abajo.
+  <br><br>
+  <select id="modelSelect">
+    <option value="lite">lite (la que usa producción hoy)</option>
+    <option value="full">full</option>
+    <option value="heavy">heavy</option>
+  </select>
+  <button id="loadModelBtn" class="secondary">Cargar esta variante</button>
+  <br><br>
+  <div id="videoWrap">
+    <video id="video" controls></video>
+    <canvas id="overlay"></canvas>
+  </div>
+  <br>
+  <button id="analyzeBtn" disabled>Analizar este cuadro</button>
+</div>
+
+<div class="panel" id="resultPanel" style="display:none;">
+  <strong>Resultado</strong>
+  <div class="row">
+    <div class="col">
+      <h3 style="margin-top:0;">landmarks (imagen 2D normalizada, 0–1)</h3>
+      <table id="tableImg"><thead><tr><th>Punto</th><th>x</th><th>y</th><th>z</th><th>visibility</th></tr></thead><tbody></tbody></table>
+    </div>
+    <div class="col">
+      <h3 style="margin-top:0;">worldLandmarks (3D métrico, metros, origen en caderas)</h3>
+      <table id="tableWorld"><thead><tr><th>Punto</th><th>x</th><th>y</th><th>z</th></tr></thead><tbody></tbody></table>
+    </div>
+  </div>
+  <div id="verdict" class="verdict pending">Analiza un cuadro para ver el veredicto.</div>
+</div>
+
+<div class="panel" id="comparePanel" style="display:none;">
+  <strong>Comparación entre variantes (mismo cuadro)</strong>
+  <div class="sub">Cada fila es un análisis que guardaste. Compara sobre todo <code>visibility</code> y si la posición del tobillo
+  se ve razonable en el overlay del video al momento de guardar — no solo los números.</div>
+  <button id="saveCompareBtn" class="secondary">+ Guardar este resultado en la comparación</button>
+  <table id="tableCompare">
+    <thead><tr><th>Variante</th><th>Tobillo L (x,y)</th><th>vis. L</th><th>Tobillo R (x,y)</th><th>vis. R</th><th>Rodilla L (x,y)</th><th>Rodilla R (x,y)</th></tr></thead>
+    <tbody></tbody>
+  </table>
+</div>
+
+<script type="module">
+import { FilesetResolver, PoseLandmarker } from 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/vision_bundle.mjs';
+
+// Misma configuracion exacta que js/services/poseDetection.js en produccion,
+// mas las variantes full/heavy siguiendo el mismo patron de URL que usa
+// Google para alojar los 3 modelos oficiales de PoseLandmarker.
+const WASM_URL = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/wasm';
+const MODEL_URLS = {
+  lite:  'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task',
+  full:  'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task',
+  heavy: 'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_heavy/float16/1/pose_landmarker_heavy.task',
+};
+
+// Los mismos 12 puntos relevantes para las metricas de sprint (caderas,
+// rodillas, tobillos, hombros, codos, munecas), con su lado y nombre.
+const JOINTS = [
+  { idx: 11, name: 'Hombro', side: 'L' }, { idx: 12, name: 'Hombro', side: 'R' },
+  { idx: 13, name: 'Codo', side: 'L' },   { idx: 14, name: 'Codo', side: 'R' },
+  { idx: 15, name: 'Muñeca', side: 'L' }, { idx: 16, name: 'Muñeca', side: 'R' },
+  { idx: 23, name: 'Cadera', side: 'L' }, { idx: 24, name: 'Cadera', side: 'R' },
+  { idx: 25, name: 'Rodilla', side: 'L' },{ idx: 26, name: 'Rodilla', side: 'R' },
+  { idx: 27, name: 'Tobillo', side: 'L' },{ idx: 28, name: 'Tobillo', side: 'R' },
+];
+
+const fileInput = document.getElementById('fileInput');
+const status = document.getElementById('status');
+const playerPanel = document.getElementById('playerPanel');
+const resultPanel = document.getElementById('resultPanel');
+const video = document.getElementById('video');
+const overlay = document.getElementById('overlay');
+const analyzeBtn = document.getElementById('analyzeBtn');
+const loadModelBtn = document.getElementById('loadModelBtn');
+const modelSelect = document.getElementById('modelSelect');
+const comparePanel = document.getElementById('comparePanel');
+const saveCompareBtn = document.getElementById('saveCompareBtn');
+const tableCompareBody = document.querySelector('#tableCompare tbody');
+const verdictEl = document.getElementById('verdict');
+const tableImgBody = document.querySelector('#tableImg tbody');
+const tableWorldBody = document.querySelector('#tableWorld tbody');
+
+let landmarker = null;
+let currentVariant = null;
+let lastLandmarks = null;
+let lastWorldLandmarks = null;
+
+fileInput.addEventListener('change', () => {
+  const file = fileInput.files[0];
+  if (!file) return;
+  video.src = URL.createObjectURL(file);
+  playerPanel.style.display = 'block';
+  status.textContent = 'Video cargado. Carga el modelo (paso "1. Cargar modelo") y luego pausa en el cuadro deseado.';
+});
+
+video.addEventListener('loadedmetadata', () => {
+  overlay.width = video.videoWidth;
+  overlay.height = video.videoHeight;
+  // Escalamos el canvas visualmente al tamaño mostrado del video, aunque su
+  // resolucion interna sea la del video real (para que los puntos calcen).
+  const resize = () => {
+    overlay.style.width = video.clientWidth + 'px';
+    overlay.style.height = video.clientHeight + 'px';
+  };
+  resize();
+  window.addEventListener('resize', resize);
+  video.addEventListener('play', resize);
+});
+
+loadModelBtn.addEventListener('click', async () => {
+  loadModelBtn.disabled = true;
+  analyzeBtn.disabled = true;
+  const variant = modelSelect.value;
+  status.textContent = `Cargando MediaPipe (variante "${variant}", GPU)…`;
+  try {
+    if (landmarker) { try { landmarker.close(); } catch (e) {} landmarker = null; }
+    const vision = await FilesetResolver.forVisionTasks(WASM_URL);
+    const baseOptions = (delegate) => ({
+      baseOptions: { modelAssetPath: MODEL_URLS[variant], delegate },
+      runningMode: 'VIDEO',
+      numPoses: 1,
+    });
+    try {
+      landmarker = await PoseLandmarker.createFromOptions(vision, baseOptions('GPU'));
+    } catch (err) {
+      console.warn('GPU falló, reintentando con CPU:', err);
+      landmarker = await PoseLandmarker.createFromOptions(vision, baseOptions('CPU'));
+    }
+    currentVariant = variant;
+    status.textContent = `✓ Modelo "${variant}" cargado. Pausa el video en el cuadro deseado y pulsa "Analizar este cuadro".`;
+    analyzeBtn.disabled = false;
+    loadModelBtn.textContent = `✓ "${variant}" cargado (cambiar variante y volver a cargar)`;
+  } catch (err) {
+    status.textContent = '✗ Error cargando el modelo: ' + err.message + ' (revisa la consola — si es 404, esa URL de variante puede no existir tal cual).';
+  } finally {
+    loadModelBtn.disabled = false;
+  }
+});
+
+analyzeBtn.addEventListener('click', () => {
+  if (!landmarker) return;
+  // Igual que en produccion: se usa detectForVideo con el timestamp actual
+  // del video en milisegundos (convertido, MediaPipe pide microsegundos o
+  // el mismo timestamp monotonico creciente -- aqui usamos ms*1000 igual
+  // que espera la API para runningMode VIDEO).
+  const result = landmarker.detectForVideo(video, performance.now());
+  const landmarks = result?.landmarks?.[0];
+  const worldLandmarks = result?.worldLandmarks?.[0];
+
+  if (!landmarks) {
+    status.textContent = '✗ No se detectó ninguna persona en este cuadro. Prueba otro momento del video.';
+    resultPanel.style.display = 'none';
+    return;
+  }
+
+  resultPanel.style.display = 'block';
+  comparePanel.style.display = 'block';
+  lastLandmarks = landmarks;
+  lastWorldLandmarks = worldLandmarks;
+  fillTable(tableImgBody, landmarks, ['x', 'y', 'z', 'visibility']);
+  fillTable(tableWorldBody, worldLandmarks, ['x', 'y', 'z']);
+  drawOverlay(landmarks);
+  computeVerdict(landmarks, worldLandmarks);
+});
+
+saveCompareBtn.addEventListener('click', () => {
+  if (!lastLandmarks) return;
+  const fmt = (idx) => `${lastLandmarks[idx].x.toFixed(3)}, ${lastLandmarks[idx].y.toFixed(3)}`;
+  const vis = (idx) => lastLandmarks[idx].visibility.toFixed(3);
+  const tr = document.createElement('tr');
+  tr.innerHTML = `<td><b>${currentVariant || '?'}</b></td>
+    <td>${fmt(27)}</td><td>${vis(27)}</td>
+    <td>${fmt(28)}</td><td>${vis(28)}</td>
+    <td>${fmt(25)}</td><td>${fmt(26)}</td>`;
+  tableCompareBody.appendChild(tr);
+});
+
+function fillTable(tbody, arr, cols) {
+  tbody.innerHTML = '';
+  for (const j of JOINTS) {
+    const p = arr?.[j.idx];
+    const tr = document.createElement('tr');
+    const badge = `<span class="badge ${j.side}">${j.side}</span>`;
+    let cells = `<td>${j.name}${badge}</td>`;
+    for (const c of cols) cells += `<td>${p ? p[c].toFixed(4) : '—'}</td>`;
+    tr.innerHTML = cells;
+    tbody.appendChild(tr);
+  }
+}
+
+function drawOverlay(landmarks) {
+  const ctx = overlay.getContext('2d');
+  ctx.clearRect(0, 0, overlay.width, overlay.height);
+  ctx.font = '16px sans-serif';
+  for (const j of JOINTS) {
+    const p = landmarks[j.idx];
+    if (!p) continue;
+    const x = p.x * overlay.width, y = p.y * overlay.height;
+    ctx.fillStyle = j.side === 'L' ? '#3A7BD5' : '#D9A441';
+    ctx.beginPath(); ctx.arc(x, y, 6, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.strokeStyle = '#000'; ctx.lineWidth = 3;
+    const label = `${j.name[0]}${j.side}`;
+    ctx.strokeText(label, x + 8, y - 8);
+    ctx.fillText(label, x + 8, y - 8);
+  }
+}
+
+function computeVerdict(landmarks, worldLandmarks) {
+  const hipImgY = (landmarks[23].y + landmarks[24].y) / 2;
+  const kneeImgY = (landmarks[25].y + landmarks[26].y) / 2;
+  const hipWorldY = worldLandmarks ? (worldLandmarks[23].y + worldLandmarks[24].y) / 2 : null;
+  const kneeWorldY = worldLandmarks ? (worldLandmarks[25].y + worldLandmarks[26].y) / 2 : null;
+
+  let html = '';
+  html += `<div>En <code>landmarks</code> (imagen 2D): cadera.y = ${hipImgY.toFixed(4)}, rodilla.y = ${kneeImgY.toFixed(4)}. `;
+  html += hipImgY < kneeImgY
+    ? `Cadera.y &lt; rodilla.y → confirma lo esperado: en coordenadas de <b>imagen</b>, Y crece hacia ABAJO (0 = arriba de la pantalla).</div>`
+    : `Cadera.y &gt; rodilla.y → INESPERADO en coordenadas de imagen normales. Revisa que el atleta esté de pie en el cuadro elegido.</div>`;
+
+  if (worldLandmarks) {
+    html += `<div style="margin-top:8px;">En <code>worldLandmarks</code> (3D métrico): cadera.y = ${hipWorldY.toFixed(4)}, rodilla.y = ${kneeWorldY.toFixed(4)}.</div>`;
+    if (hipWorldY > kneeWorldY) {
+      verdictEl.className = 'verdict up';
+      html += `<div style="margin-top:8px;">✅ <b>VEREDICTO: worldLandmarks usa Y HACIA ARRIBA</b> (cadera, que está físicamente más alta, tiene un valor de Y mayor que la rodilla). La fórmula <code>hip.y - knee.y</code> en <code>computeKneeHeightNormalized</code> es correcta tal cual está — NO hay que invertir signo.</div>`;
+    } else {
+      verdictEl.className = 'verdict down';
+      html += `<div style="margin-top:8px;">⚠️ <b>VEREDICTO: worldLandmarks usa Y HACIA ABAJO</b> (igual que la imagen 2D) — la cadera tiene un valor de Y MENOR que la rodilla pese a estar más alta. La suposición de DeepSeek era incorrecta. Hay que usar <code>knee.y - hip.y</code> (invertido) en <code>computeKneeHeightNormalized</code>, no <code>hip.y - knee.y</code>.</div>`;
+    }
+  } else {
+    html += `<div style="margin-top:8px; color:#C8332A;">⚠️ Este cuadro no devolvió worldLandmarks (puede pasar si la confianza de la detección es baja). Prueba con otro cuadro más claro.</div>`;
+  }
+
+  html += `<div style="margin-top:10px; font-size:12px; color:#8A857C;">Revisa también visualmente en el video: las etiquetas azules (L) deben caer sobre el lado IZQUIERDO real del atleta tal como se ve en pantalla (el derecho del atleta, si te mira de frente, o el que corresponda si está de perfil) — si ves una etiqueta "RD" (rodilla derecha) sobre lo que claramente es la pierna izquierda del atleta, hay un problema de identidad que no depende del eje Y.</div>`;
+
+  verdictEl.innerHTML = html;
+}
+</script>
+
+</body>
+</html>

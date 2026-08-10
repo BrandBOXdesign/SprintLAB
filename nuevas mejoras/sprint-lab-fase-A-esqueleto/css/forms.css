@@ -1,0 +1,53 @@
+/* Auto-generado a partir de index_-_copia.html durante la modularizacion (2026-07-04) */
+  .field { margin-bottom: 14px; }
+  .row { display: flex; gap: 12px; }
+  .row > .field.half { flex: 1; }
+  label.field-label { display: block; font-size: 11px; letter-spacing: 0.5px; color: var(--muted); margin-bottom: 6px; text-transform: uppercase; }
+  .day-label-input { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; color: var(--text); padding: 3px 6px; font-size: 12px; margin-top: 2px; }
+  .day-type-select { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; color: var(--text); padding: 3px 4px; font-size: 11px; }
+  .day-duration-input { width: 60px; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; color: var(--text); padding: 3px 4px; font-size: 12px; text-align: center; flex-shrink: 0; }
+  .calc-hint { font-size: 12.5px; color: var(--gold); margin-bottom: 14px; margin-top: -6px; }
+  .calc-hint-source { color: var(--muted); }
+  .session-list { display: flex; flex-direction: column; gap: 8px; }
+  .session-row { display: flex; align-items: center; gap: 12px; background: var(--card); border: 1px solid var(--border); border-radius: 6px; padding: 12px 14px; }
+  .session-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .session-info { flex: 1; }
+  .session-type { font-size: 13.5px; font-weight: 600; }
+  .session-date { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+  .session-row-wrap { position: relative; overflow: hidden; border-radius: 6px; }
+  .session-row-wrap .session-row { position: relative; z-index: 1; }
+  .session-delete-action { position: absolute; top: 0; right: 0; height: 100%; width: 84px; background: var(--red); color: #fff; border: none; border-radius: 6px; font-weight: 700; font-size: 12px; cursor: pointer; }
+  .series-block { margin-bottom: 14px; }
+  .series-block-title { font-size: 11px; letter-spacing: 0.5px; color: var(--muted); text-transform: uppercase; margin-bottom: 8px; }
+  .series-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
+  .serie-row { display: flex; align-items: center; gap: 8px; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: 8px 10px; }
+  .serie-num { font-size: 10px; color: var(--gold); font-weight: 700; min-width: 20px; font-family: 'Arial Narrow', Arial, sans-serif; }
+  .serie-data { flex: 1; font-size: 13px; color: var(--text2); }
+  .serie-data span { color: var(--text); font-weight: 600; }
+  .serie-wind { font-size: 11px; color: var(--muted); margin-left: 6px; }
+  .serie-delete { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 15px; padding: 0 2px; line-height: 1; }
+  .serie-delete:hover { color: var(--red); }
+  .serie-form { background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: 10px; margin-top: 6px; }
+  .serie-form-title { font-size: 11px; color: var(--gold); font-weight: 700; letter-spacing: 0.5px; margin-bottom: 8px; text-transform: uppercase; }
+  .serie-form .row { margin-bottom: 8px; }
+  .serie-confirm-btn { width: 100%; background: rgba(200,51,42,0.15); color: var(--red); border: 1px solid rgba(200,51,42,0.4); border-radius: 4px; padding: 9px; font-size: 13px; font-weight: 700; cursor: pointer; margin-top: 4px; }
+  .serie-confirm-btn:hover { background: rgba(200,51,42,0.25); }
+  .clinical-notes-area { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; color: var(--text); padding: 10px 12px; font-size: 14px; font-family: inherit; resize: vertical; min-height: 90px; line-height: 1.5; }
+  .clinical-notes-area:focus { outline: none; border-color: var(--gold); }
+  .gym-type-selector { display: flex; gap: 6px; margin-bottom: 14px; }
+  .gym-type-btn { flex: 1; background: transparent; border: 1px solid var(--border); border-radius: 4px; padding: 8px 4px; font-size: 11px; font-weight: 600; color: var(--muted); cursor: pointer; text-align: center; }
+  .gym-type-btn.active { border-color: var(--gold); color: var(--gold); background: rgba(217,164,65,0.08); }
+  .gap-warning { display: flex; align-items: flex-start; gap: 10px; background: rgba(217,164,65,0.08); border: 1px solid rgba(217,164,65,0.35); border-radius: 6px; padding: 12px 14px; margin-bottom: 14px; }
+  .gap-warning-icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+  .gap-warning-text { font-size: 12.5px; color: var(--gold); line-height: 1.5; }
+  .gap-warning-text strong { display: block; font-weight: 700; margin-bottom: 2px; }
+  .field-error { font-size: 11.5px; color: var(--red); margin-top: 5px; line-height: 1.4; }
+  .field-warn { font-size: 11.5px; color: var(--gold); margin-top: 5px; line-height: 1.4; }
+  input.input-error { border-color: var(--red) !important; }
+  input.input-warn { border-color: var(--gold) !important; }
+  .serie-velocity { font-size: 12px; color: var(--gold); font-weight: 600; margin-left: 6px; }
+  .exercise-checkbox-group { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+  .exercise-checkbox { display: flex; align-items: center; gap: 4px; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: 4px 8px; cursor: pointer; }
+  .exercise-checkbox input[type="checkbox"] { width: auto; margin: 0; accent-color: var(--red); }
+  .exercise-checkbox label { font-size: 12px; color: var(--text2); cursor: pointer; }
+  .exercise-checkbox.active { border-color: var(--gold); background: rgba(217,164,65,0.08); }
