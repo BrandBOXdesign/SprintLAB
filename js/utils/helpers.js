@@ -1,5 +1,7 @@
 // Auto-generado a partir de index_-_copia.html durante la modularizacion (2026-07-04)
-export function todayISO() { const d = new Date(); return d.toISOString().slice(0, 10); }
+// Fecha LOCAL (YYYY-MM-DD). toISOString() usa UTC y de noche, en zonas con
+// offset negativo (ej. México), devolvía el día siguiente.
+export function todayISO() { const d = new Date(); const p = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`; }
 
 export function dateFieldToISO(dateStr) { return dateStr ? new Date(dateStr + 'T12:00:00').toISOString() : new Date().toISOString(); }
 

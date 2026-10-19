@@ -19,13 +19,13 @@ export function saveCurrentModel(modelId) {
       const seasonStart = state.athlete && state.athlete.seasonStart;
       const currentPhase = seasonStart ? getCurrentPhase(seasonStart, state.customPhases || []) : null;
       const template = (currentPhase && currentPhase.weeklyTemplate) || WEEK_DAYS.map(day => ({ day, type: 'rest', label: '' }));
-      plan = template.map(day => ({ ...day, customLabel: day.label, plannedDuration: DEFAULT_DURATIONS[day.type] || 60 }));
+      plan = template.map(day => ({ ...day, customLabel: day.label, plannedDuration: DEFAULT_DURATIONS[day.type] ?? 60 }));
       DB.saveWeeklyPlan(state.currentAthleteId, plan);
       state.weeklyPlan = plan;
     } else {
       const modelData = MACRO_MODELS[modelId];
       if (modelData) {
-        plan = modelData.weeklyTemplate.map(day => ({ ...day, customLabel: day.label, plannedDuration: DEFAULT_DURATIONS[day.type] || 60 }));
+        plan = modelData.weeklyTemplate.map(day => ({ ...day, customLabel: day.label, plannedDuration: DEFAULT_DURATIONS[day.type] ?? 60 }));
         DB.saveWeeklyPlan(state.currentAthleteId, plan);
         state.weeklyPlan = plan;
       }

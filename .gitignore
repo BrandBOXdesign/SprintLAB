@@ -1,0 +1,6 @@
+node_modules/
+dist/
+*.zip
+sprint.mp4
+SIN VIDEO/
+.claude/

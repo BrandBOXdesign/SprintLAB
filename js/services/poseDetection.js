@@ -4,23 +4,21 @@
 // (WASM + WebGL), sin mandar el video a ningún servidor.
 //
 // Librería: @mediapipe/tasks-vision@0.10.35 (version estable verificada,
-// NO @latest ni un release candidate 1.0.0-rc.*). El bundle JS se pide a
-// jsDelivr y el modelo de pose (~unos MB) a Google Cloud Storage — ambos
-// requieren internet la primera vez que se usa esta función en particular
-// (el resto del sistema de video de la app es 100% local; esto es la
-// excepción, ver aviso en el panel de Ayuda / README si se agrega).
-import { FilesetResolver, PoseLandmarker } from 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/vision_bundle.mjs';
+// NO @latest ni un release candidate 1.0.0-rc.*). El bundle JS, el runtime
+// WASM y los modelos lite/heavy viven en vendor/ (descargados una vez): el
+// analisis de video funciona 100% local, sin internet.
+import { FilesetResolver, PoseLandmarker } from '../../vendor/mediapipe/vision_bundle.mjs';
 import { countContacts, fillGapsWithMotionInterpolation, rejectImplausibleDetections } from './poseLogic.js';
 
-const WASM_URL = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/wasm';
-const MODEL_URL = 'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task';
+const WASM_URL = new URL('../../vendor/mediapipe/wasm', import.meta.url).href;
+const MODEL_URL = new URL('../../vendor/models/pose_landmarker_lite.task', import.meta.url).href;
 // Variante "heavy": mismo formato de salida (33 landmarks), notablemente
 // mas precisa en oclusiones (extremidades cruzandose, que es exactamente
 // el problema reportado en la carrera) a cambio de tardar mas por cuadro.
 // Solo se usa en analyzeFullSkeleton() -- analyzeStrideCadence() sigue con
 // la "lite" porque ahi solo nos interesan los tobillos y la velocidad de
 // deteccion importa mas que la precision fina de oclusion.
-const MODEL_URL_HEAVY = 'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_heavy/float16/1/pose_landmarker_heavy.task';
+const MODEL_URL_HEAVY = new URL('../../vendor/models/pose_landmarker_heavy.task', import.meta.url).href;
 
 // Indices del esqueleto de 33 puntos de MediaPipe Pose. Y normalizado 0-1,
 // creciendo hacia ABAJO (y=0 arriba del frame, y=1 abajo).

@@ -31,7 +31,7 @@ export function exportSessionsCSV() {
 export function exportProfileJSON() {
   const athlete = state.athlete, sessions = state.sessions;
   if (!athlete) return;
-  const data = { exportDate: new Date().toISOString(), appVersion: 'Sprint Lab v2', athlete, model: state.model, clinicalNotes: DB.getClinicalNotes(state.currentAthleteId), sessions: [...sessions].sort((a, b) => new Date(a.date) - new Date(b.date)) };
+  const data = { exportDate: new Date().toISOString(), appVersion: 'Sprint Lab v2', athlete, model: state.model, weeklyPlan: state.weeklyPlan, customPhases: state.customPhases, clinicalNotes: DB.getClinicalNotes(state.currentAthleteId), sessions: [...sessions].sort((a, b) => new Date(a.date) - new Date(b.date)) };
   const json = JSON.stringify(data, null, 2);
   const blob = new Blob([json], { type: 'application/json;charset=utf-8;' });
   const url = URL.createObjectURL(blob);

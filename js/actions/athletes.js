@@ -25,13 +25,13 @@ export function selectAthlete(id) {
     const currentPhase = seasonStart ? getCurrentPhase(seasonStart, state.customPhases) : null;
     const defaultDurations = { gym: 60, track: 90, field: 120, rest: 0 };
     const template = (currentPhase && currentPhase.weeklyTemplate) || ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'].map(day => ({ day, type: 'rest', label: '' }));
-    plan = template.map(day => ({ ...day, customLabel: day.label, plannedDuration: defaultDurations[day.type] || 60 }));
+    plan = template.map(day => ({ ...day, customLabel: day.label, plannedDuration: defaultDurations[day.type] ?? 60 }));
     DB.saveWeeklyPlan(id, plan);
   } else if (!plan && state.model) {
     const modelData = MACRO_MODELS[state.model];
     if (modelData) {
       const defaultDurations = { gym: 60, track: 90, field: 120, rest: 0 };
-      plan = modelData.weeklyTemplate.map(day => ({ ...day, customLabel: day.label, plannedDuration: defaultDurations[day.type] || 60 }));
+      plan = modelData.weeklyTemplate.map(day => ({ ...day, customLabel: day.label, plannedDuration: defaultDurations[day.type] ?? 60 }));
       DB.saveWeeklyPlan(id, plan);
     }
   }

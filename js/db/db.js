@@ -1,16 +1,29 @@
 // Auto-generado a partir de index_-_copia.html durante la modularizacion (2026-07-04)
+// Escritura segura: localStorage lanza QuotaExceededError al llenarse (~5 MB).
+// En vez de romper el flujo de la acción, se avisa con un evento que app.js
+// convierte en state.saveError (banner visible) y se devuelve false.
+const _setItem = localStorage.setItem.bind(localStorage);
+function safeSet(key, value) {
+  try { _setItem(key, value); return true; }
+  catch (err) {
+    console.error('Sprint Lab: no se pudo guardar', key, err);
+    window.dispatchEvent(new CustomEvent('sl:storage-error', { detail: { key, err } }));
+    return false;
+  }
+}
+
 export const DB = {
   getAthleteIds() {
     try { return JSON.parse(localStorage.getItem('sl:athlete-ids') || '[]'); } catch { return []; }
   },
   saveAthleteIds(ids) {
-    localStorage.setItem('sl:athlete-ids', JSON.stringify(ids));
+    safeSet('sl:athlete-ids', JSON.stringify(ids));
   },
   getAthlete(id) {
     try { return JSON.parse(localStorage.getItem(`sl:athlete:${id}`) || 'null'); } catch { return null; }
   },
   saveAthlete(id, data) {
-    localStorage.setItem(`sl:athlete:${id}`, JSON.stringify(data));
+    safeSet(`sl:athlete:${id}`, JSON.stringify(data));
   },
   deleteAthlete(id) {
     localStorage.removeItem(`sl:athlete:${id}`);
@@ -38,31 +51,31 @@ export const DB = {
     } catch { return []; }
   },
   saveSessions(athleteId, sessions) {
-    localStorage.setItem(`sl:sessions:${athleteId}`, JSON.stringify(sessions));
+    safeSet(`sl:sessions:${athleteId}`, JSON.stringify(sessions));
   },
   getModel(athleteId) {
     try { return JSON.parse(localStorage.getItem(`sl:model:${athleteId}`) || 'null'); } catch { return null; }
   },
   saveModel(athleteId, modelId) {
-    localStorage.setItem(`sl:model:${athleteId}`, JSON.stringify(modelId));
+    safeSet(`sl:model:${athleteId}`, JSON.stringify(modelId));
   },
   getClinicalNotes(athleteId) {
     return localStorage.getItem(`sl:notes:${athleteId}`) || '';
   },
   saveClinicalNotes(athleteId, notes) {
-    localStorage.setItem(`sl:notes:${athleteId}`, notes);
+    safeSet(`sl:notes:${athleteId}`, notes);
   },
   getWeeklyPlan(athleteId) {
     try { return JSON.parse(localStorage.getItem(`sl:weeklyPlan:${athleteId}`) || 'null'); } catch { return null; }
   },
   saveWeeklyPlan(athleteId, plan) {
-    localStorage.setItem(`sl:weeklyPlan:${athleteId}`, JSON.stringify(plan));
+    safeSet(`sl:weeklyPlan:${athleteId}`, JSON.stringify(plan));
   },
   getDismissedNotifications(athleteId) {
     try { return JSON.parse(localStorage.getItem(`sl:dismissed:${athleteId}`) || '[]'); } catch { return []; }
   },
   saveDismissedNotifications(athleteId, list) {
-    localStorage.setItem(`sl:dismissed:${athleteId}`, JSON.stringify(list));
+    safeSet(`sl:dismissed:${athleteId}`, JSON.stringify(list));
   },
   // Fase 1.2 del roadmap (version simplificada, sin Google Drive/OneDrive):
   // solo recordamos CUANDO fue el ultimo backup local (JSON) que el propio
@@ -73,17 +86,17 @@ export const DB = {
     return localStorage.getItem('sl:last-backup-date') || null;
   },
   saveLastBackupDate(isoDate) {
-    localStorage.setItem('sl:last-backup-date', isoDate);
+    safeSet('sl:last-backup-date', isoDate);
   },
   // Fase 5.2 del roadmap: orden de los widgets del dashboard, elegido por el
   // propio entrenador arrastrandolos. Es una preferencia de UI global de la
   // app (no por atleta), guardada como un simple arreglo de ids.
   getDashboardOrder() {
     const raw = localStorage.getItem('sl:dashboard-order');
-    return raw ? JSON.parse(raw) : null;
+    try { return raw ? JSON.parse(raw) : null; } catch { return null; }
   },
   saveDashboardOrder(orderArray) {
-    localStorage.setItem('sl:dashboard-order', JSON.stringify(orderArray));
+    safeSet('sl:dashboard-order', JSON.stringify(orderArray));
   },
   migrate() {
     const oldAthlete = localStorage.getItem('sprintlab-athlete-profile');
@@ -115,6 +128,6 @@ export const DB = {
     try { return raw ? JSON.parse(raw) : []; } catch { return []; }
   },
   saveCustomPhases(athleteId, phases) {
-    localStorage.setItem(`sl:customPhases:${athleteId}`, JSON.stringify(phases));
+    safeSet(`sl:customPhases:${athleteId}`, JSON.stringify(phases));
   },
 };

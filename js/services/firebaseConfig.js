@@ -23,9 +23,12 @@
 //   }
 //   Esto asegura que cada entrenador solo puede leer/escribir sus propios datos.
 
-import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.15.0/firebase-app.js';
-import { getAuth } from 'https://www.gstatic.com/firebasejs/12.15.0/firebase-auth.js';
-import { getFirestore } from 'https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore.js';
+// IMPORTANTE (modo offline): el SDK de Firebase se carga con import()
+// dinámico y solo cuando se usa la nube (getFirebase). Un import estático
+// desde gstatic.com hacía que, sin internet, FALLARA todo el grafo de
+// módulos y la app ni siquiera arrancaba.
+const FIREBASE_VERSION = '12.15.0';
+const FB_BASE = `https://www.gstatic.com/firebasejs/${FIREBASE_VERSION}`;
 
 // TODO: reemplaza esto con el firebaseConfig real de tu proyecto (paso 4 de arriba).
 const firebaseConfig = {
@@ -40,13 +43,24 @@ const firebaseConfig = {
 
 export const FIREBASE_CONFIGURED = firebaseConfig.apiKey !== 'TU_API_KEY';
 
-let app = null, auth = null, firestore = null;
-if (FIREBASE_CONFIGURED) {
-  app = initializeApp(firebaseConfig);
-  auth = getAuth(app);
-  firestore = getFirestore(app);
-} else {
-  console.warn('Sprint Lab: Firebase no está configurado todavía (js/services/firebaseConfig.js). La app sigue funcionando 100% localmente hasta que pegues tu firebaseConfig ahí.');
+let _fb = null;
+/**
+ * Carga (una sola vez) el SDK de Firebase y devuelve { app, auth, firestore, authApi, fsApi }.
+ * Lanza si no hay configuración o no hay internet; quien llama debe atrapar el error.
+ */
+export async function getFirebase() {
+  if (!FIREBASE_CONFIGURED) throw new Error('Firebase no está configurado. Edita js/services/firebaseConfig.js primero.');
+  if (!_fb) {
+    _fb = (async () => {
+      const [{ initializeApp }, authApi, fsApi] = await Promise.all([
+        import(`${FB_BASE}/firebase-app.js`),
+        import(`${FB_BASE}/firebase-auth.js`),
+        import(`${FB_BASE}/firebase-firestore.js`),
+      ]);
+      const app = initializeApp(firebaseConfig);
+      return { app, auth: authApi.getAuth(app), firestore: fsApi.getFirestore(app), authApi, fsApi };
+    })();
+    _fb.catch(() => { _fb = null; }); // permite reintentar si la primera carga falló por falta de red
+  }
+  return _fb;
 }
-
-export { app, auth, firestore };

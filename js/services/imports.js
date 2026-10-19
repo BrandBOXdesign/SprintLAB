@@ -3,15 +3,33 @@ import { DB } from '../db/db.js';
 import { render } from '../render/layout.js';
 import { state } from '../state/state.js';
 import { avg1RM, estimatePower, estimateVelocity } from '../utils/calculations.js';
-import { todayISO } from '../utils/helpers.js';
+import { dateFieldToISO, todayISO } from '../utils/helpers.js';
 
 import { showToast } from '../utils/notifications.js';
+
+// Divide una línea CSV respetando campos entre comillas (el exportador usa
+// escapeCSV, que pone comillas cuando hay comas, comillas o saltos de línea).
+function splitCSVLine(line, sep) {
+  const out = []; let cur = '', inQ = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (inQ) {
+      if (c === '"' && line[i + 1] === '"') { cur += '"'; i++; }
+      else if (c === '"') inQ = false;
+      else cur += c;
+    } else if (c === '"') inQ = true;
+    else if (c === sep) { out.push(cur.trim()); cur = ''; }
+    else cur += c;
+  }
+  out.push(cur.trim());
+  return out;
+}
 
 export function importCSV(file) {
   const reader = new FileReader();
   reader.onload = function(e) {
     const text = e.target.result;
-    const lines = text.split('\n').filter(line => line.trim() !== '');
+    const lines = text.replace(/^﻿/, '').split(/\r?\n/).filter(line => line.trim() !== '');
     if (lines.length < 2) { showToast('El archivo CSV está vacío o no tiene encabezados.'); return; }
     const firstLine = lines[0];
     const separator = firstLine.includes(';') ? ';' : ',';
@@ -21,7 +39,7 @@ export function importCSV(file) {
     const sessionsToAdd = [];
     let errorCount = 0;
     for (let i = 1; i < lines.length; i++) {
-      const cols = lines[i].split(separator).map(c => c.trim());
+      const cols = splitCSVLine(lines[i], separator);
       if (cols.length < 4) continue;
       try {
         const dateStr = cols[idx.fecha];
@@ -48,7 +66,13 @@ export function importCSV(file) {
               const time = parseFloat(parts[1].replace('s', ''));
               let wind = null;
               if (parts.length >= 3) { const windStr = parts[2].replace('viento', '').trim(); wind = parseFloat(windStr); }
-              if (!isNaN(dist) && !isNaN(time) && time > 0) trackSeries.push({ dist: String(dist), time: String(time), wind: wind });
+              const serie = { dist: String(dist), time: String(time), wind: isNaN(wind) ? null : wind };
+              for (const extra of parts.slice(2)) {
+                const r = extra.match(/^reac([\d.]+)/), st = extra.match(/^sal([\d.]+)/);
+                if (r) serie.reactionTime = parseFloat(r[1]);
+                if (st) serie.startTime = parseFloat(st[1]);
+              }
+              if (!isNaN(dist) && !isNaN(time) && time > 0) trackSeries.push(serie);
             }
           });
         }
@@ -56,7 +80,7 @@ export function importCSV(file) {
         if (idx.ejercicios_gym !== -1 && cols[idx.ejercicios_gym]) {
           const gymItems = cols[idx.ejercicios_gym].split(';').map(s => s.trim()).filter(s => s);
           gymItems.forEach(item => {
-            const match = item.match(/(.+?)\s+(\d+)kg×(\d+)/);
+            const match = item.match(/(.+?)\s+(\d+(?:\.\d+)?)kg×(\d+)/);
             if (match) {
               const exercise = match[1].trim();
               const weight = parseFloat(match[2]);
@@ -71,7 +95,8 @@ export function importCSV(file) {
           });
         }
         const session = {
-          date: dateISO, type, rpe, durationMin: duration, notes,
+          id: Date.now() + sessionsToAdd.length, // sin id, borrar una sesión importada borraba todas las importadas
+          date: dateFieldToISO(dateISO), type, rpe, durationMin: duration, notes,
           trackSeries: type === 'track' ? trackSeries : [],
           time100: null, time200: null,
           gymExercises: type === 'gym' ? gymExercises : [],
@@ -100,7 +125,7 @@ export function importCSV(file) {
 // Fase 2.1 del roadmap: importar una salida de pista/campo desde un archivo
 // GPX (reloj GPS / app de running). Crea UNA sesión tipo "field" con los
 // puntos de la ruta (para el mapa) y la velocidad instantánea (para la
-// gráfica), usando la librería GPXParser ya cargada por CDN (variable global
+// gráfica), usando la librería GPXParser ya cargada localmente desde vendor/ (variable global
 // `gpxParser`, ver index.html).
 export function importGPX(file) {
   const reader = new FileReader();
@@ -144,7 +169,7 @@ export function importGPX(file) {
 
       const session = {
         id: Date.now(),
-        date: dateISO, type: 'field', rpe: 5, durationMin,
+        date: dateFieldToISO(dateISO), type: 'field', rpe: 5, durationMin,
         notes: `Importado desde GPX · ${(distanceTotal / 1000).toFixed(2)} km`,
         trackSeries: [], time100: null, time200: null,
         gymExercises: [], gymSessionType: null, estimated1RM: null,
@@ -178,7 +203,9 @@ export function importGPX(file) {
 // abajo) para ver los nombres exactos que tu dispositivo produce.
 export async function importFIT(file) {
   try {
-    const { default: FitParser } = await import('https://cdn.jsdelivr.net/npm/fit-file-parser@1.9.0/+esm');
+    const fitModule = await import('../../vendor/fit-file-parser/index.js');
+    // El bundle +esm de jsDelivr envuelve el CommonJS: default es { default: FitParser }, no la clase (verificado en navegador).
+    const FitParser = typeof fitModule.default === 'function' ? fitModule.default : fitModule.default.default;
     const buffer = await file.arrayBuffer();
     const parser = new FitParser({ force: true, speedUnit: 'm/s', lengthUnit: 'm', temperatureUnit: 'celsius', mode: 'cascade' });
 
@@ -189,6 +216,9 @@ export async function importFIT(file) {
       const session = (data.sessions && data.sessions[0]) || {};
       const laps = session.laps || [];
       const records = laps.flatMap(l => l.records || []);
+
+      // force:true hace que el parser "acepte" archivos que no son FIT y devuelva todo vacío: no crear una sesión fantasma.
+      if (!session.total_distance && !session.total_elapsed_time && records.length === 0) { showToast('El archivo FIT no contiene datos de actividad.'); return; }
 
       const distanceTotal = Number(session.total_distance) || 0; // metros
       const durationTotal = Number(session.total_elapsed_time) || null; // segundos
@@ -213,7 +243,7 @@ export async function importFIT(file) {
       const durationMin = durationTotal ? Math.max(1, Math.round(durationTotal / 60)) : Math.max(1, Math.round((distanceTotal / 1000) * 5));
       const newSession = {
         id: Date.now(),
-        date: dateISO, type: 'field', rpe: 5, durationMin,
+        date: dateFieldToISO(dateISO), type: 'field', rpe: 5, durationMin,
         notes: `Importado desde FIT · ${(distanceTotal / 1000).toFixed(2)} km`,
         trackSeries: [], time100: null, time200: null,
         gymExercises: [], gymSessionType: null, estimated1RM: null,
@@ -228,6 +258,34 @@ export async function importFIT(file) {
     });
   } catch (err) {
     console.error(err);
-    showToast('No se pudo cargar el lector de archivos FIT (revisa tu conexión a internet).');
+    showToast('No se pudo cargar el lector de archivos FIT.');
   }
+}
+
+// Restaura un Backup JSON (exportProfileJSON) como un atleta NUEVO -- nunca
+// pisa los datos del atleta actual, asi que es seguro probarlo sin miedo.
+// Los videos no viajan en el backup (viven en IndexedDB): se quita videoId.
+export function importBackupJSON(file) {
+  const reader = new FileReader();
+  reader.onload = function (e) {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!data || !data.athlete || !Array.isArray(data.sessions)) { showToast('El archivo no parece un Backup JSON de Sprint Lab.'); return; }
+      const id = 'athlete-' + Date.now();
+      const athlete = { ...data.athlete, id, name: (data.athlete.name || 'Atleta') + ' (restaurado)' };
+      const ids = DB.getAthleteIds(); ids.push(id); DB.saveAthleteIds(ids);
+      DB.saveAthlete(id, athlete);
+      DB.saveSessions(id, data.sessions.map((s, i) => ({ ...s, id: s.id || Date.now() + i, videoId: null, videoMarkers: [] })));
+      if (data.model) DB.saveModel(id, data.model);
+      if (data.weeklyPlan) DB.saveWeeklyPlan(id, data.weeklyPlan);
+      if (Array.isArray(data.customPhases)) DB.saveCustomPhases(id, data.customPhases);
+      if (data.clinicalNotes) DB.saveClinicalNotes(id, data.clinicalNotes);
+      state.athletes.push(athlete);
+      showToast(`✅ Backup restaurado como "${athlete.name}" (${data.sessions.length} sesiones). Está en la lista de atletas.`);
+    } catch (err) {
+      console.error(err);
+      showToast('No se pudo leer el Backup JSON (archivo dañado o inválido).');
+    }
+  };
+  reader.readAsText(file, 'UTF-8');
 }

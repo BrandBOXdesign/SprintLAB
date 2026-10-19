@@ -21,6 +21,8 @@ const MIME_TYPES = {
   '.svg': 'image/svg+xml',
   '.ico': 'image/x-icon',
   '.gpx': 'application/gpx+xml',
+  '.wasm': 'application/wasm',
+  '.task': 'application/octet-stream',
 };
 
 function startLocalServer() {

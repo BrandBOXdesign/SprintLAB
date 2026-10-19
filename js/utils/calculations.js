@@ -297,7 +297,7 @@ export function getAlerts(athlete, sessions, weeklyPlan) {
   return alerts;
 }
 
-export function getPlannedVolume(plan) { if (!plan) return 0; return plan.reduce((sum, day) => sum + (Number(day.plannedDuration) || 0), 0); }
+export function getPlannedVolume(plan) { if (!plan) return 0; return plan.reduce((sum, day) => sum + (day.type === 'rest' ? 0 : (Number(day.plannedDuration) || 0)), 0); }
 
 export function getRealizedVolume(sessions) {
   const { start, end } = getWeekRange();
