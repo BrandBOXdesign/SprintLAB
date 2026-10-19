@@ -84,7 +84,7 @@ export function renderWeekScreen() {
     ]);
     typeSelect.value = day.type;
     const labelInput = el('input', { class: 'day-label-input', value: day.customLabel || day.label || '', oninput: (e) => { state.weeklyPlan[idx].customLabel = e.target.value; DB.saveWeeklyPlan(state.currentAthleteId, state.weeklyPlan); }, placeholder: 'Contenido del día' });
-    const durationInput = el('input', { type: 'number', class: 'day-duration-input', value: day.plannedDuration || 0, min: 0, step: 5, oninput: (e) => { state.weeklyPlan[idx].plannedDuration = Number(e.target.value) || 0; DB.saveWeeklyPlan(state.currentAthleteId, state.weeklyPlan); render(); }, title: 'Duración planificada (min)' });
+    const durationInput = el('input', { type: 'number', class: 'day-duration-input', value: day.plannedDuration || 0, min: 0, step: 5, oninput: (e) => { state.weeklyPlan[idx].plannedDuration = Number(e.target.value) || 0; delete state.weeklyPlan[idx].baseDuration; DB.saveWeeklyPlan(state.currentAthleteId, state.weeklyPlan); render(); }, title: 'Duración planificada (min)' });
     return el('div', { class: 'day-lane' }, [
       el('div', { class: 'day-marker', style: { backgroundColor: DAY_COLORS[day.type] } }),
       el('div', { class: 'day-info' }, [el('div', { class: 'day-name' }, day.day), labelInput]),
