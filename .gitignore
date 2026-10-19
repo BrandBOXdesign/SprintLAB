@@ -1,0 +1,8 @@
+node_modules/
+dist/
+*.zip
+sprint.mp4
+SIN VIDEO/
+.claude/
+js/services/deepseek_*
+js/services/claude_*

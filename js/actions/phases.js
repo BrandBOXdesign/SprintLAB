@@ -10,7 +10,7 @@ function persist() {
 
 export function addPhase() {
   state.customPhases.push({
-    id: 'phase-' + Date.now(),
+    id: 'phase-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
     name: 'Nueva fase',
     duration: 4,
     unit: 'weeks', // 'weeks' | 'months'

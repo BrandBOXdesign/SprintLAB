@@ -91,5 +91,7 @@ export const state = {
     skeletonVideoWidth: null,      // dimensiones nativas del video analizado, para el aspect ratio del panel de replay (ver skeletonOverlay.js)
     skeletonVideoHeight: null,
     skeletonError: null,
+    skeletonMetrics: null,         // salida de computeMetrics (ver services/trackingMetrics.js), o null
+    skeletonIdentity: null,        // reporte de applyIdentityTracking (swaps corregidos), o null
   },
 };

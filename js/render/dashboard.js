@@ -2,7 +2,7 @@
 import { DB } from '../db/db.js';
 import { MACRO_MODELS } from '../models/macrocycles.js';
 import { exportProfileJSON, exportSessionsCSV, generatePDFReport } from '../services/exports.js';
-import { importCSV, importFIT, importGPX } from '../services/imports.js';
+import { importBackupJSON, importCSV, importFIT, importGPX } from '../services/imports.js';
 import { render } from './layout.js';
 import { state } from '../state/state.js';
 import { acuteChronicRatio, calcularMonotony, calcularStrain, calcularTRIMP, getAlerts, getBestTimes, getDailyLoads, getNextSession, getPlannedVolume, getRealizedVolume, getVolumeStatus, monotonyStatus, ratioStatus, sugerirCarga } from '../utils/calculations.js';
@@ -87,6 +87,7 @@ export function renderDashboardScreen() {
   const fileInput = el('input', { type: 'file', id: 'file-input', accept: '.csv', onchange: (e) => { const file = e.target.files[0]; if (file) importCSV(file); e.target.value = ''; } });
   const gpxFileInput = el('input', { type: 'file', id: 'file-input2', accept: '.gpx', onchange: (e) => { const file = e.target.files[0]; if (file) importGPX(file); e.target.value = ''; } });
   const fitFileInput = el('input', { type: 'file', id: 'file-input3', accept: '.fit', onchange: (e) => { const file = e.target.files[0]; if (file) importFIT(file); e.target.value = ''; } });
+  const jsonFileInput = el('input', { type: 'file', id: 'file-input4', accept: '.json', onchange: (e) => { const file = e.target.files[0]; if (file) importBackupJSON(file); e.target.value = ''; } });
   const exportRow = el('div', { class: 'export-row' }, [
     el('button', { class: 'export-btn', onClick: exportSessionsCSV }, [el('span', { class: 'export-icon' }, '⬇'), 'Sesiones CSV']),
     el('button', { class: 'export-btn', onClick: exportProfileJSON }, [el('span', { class: 'export-icon' }, '⬇'), 'Backup JSON']),
@@ -95,6 +96,8 @@ export function renderDashboardScreen() {
   const importBtn = el('button', { class: 'import-btn', onClick: () => document.getElementById('file-input').click() }, [el('span', {}, '📂'), 'Importar sesiones desde CSV']);
   const gpxImportBtn = el('button', { class: 'import-btn', style: { marginTop: '8px' }, onClick: () => document.getElementById('file-input2').click() }, [el('span', {}, '🗺️'), 'Importar salida desde GPX']);
   const fitImportBtn = el('button', { class: 'import-btn', style: { marginTop: '8px' }, onClick: () => document.getElementById('file-input3').click() }, [el('span', {}, '⌚'), 'Importar salida desde FIT']);
+
+  const jsonImportBtn = el('button', { class: 'import-btn', style: { marginTop: '8px' }, onClick: () => document.getElementById('file-input4').click() }, [el('span', {}, '♻️'), 'Restaurar Backup JSON (como atleta nuevo)']);
 
   // Fase 5.2: aplicar el orden guardado por el entrenador (si existe), y si
   // hay widgets nuevos que no estaban guardados (por una actualizacion
@@ -105,7 +108,7 @@ export function renderDashboardScreen() {
   for (const id of DEFAULT_WIDGET_ORDER) if (!widgetOrder.includes(id)) widgetOrder.push(id);
   const orderedWidgetCards = widgetOrder.map(id => widgetsById[id]);
 
-  const grid = el('div', { class: 'dashboard-grid' }, [identityCard, ...orderedWidgetCards, el('div', { class: 'dashboard-card full', style: { padding: '10px' } }, [exportRow, importBtn, fileInput, gpxImportBtn, gpxFileInput, fitImportBtn, fitFileInput])]);
+  const grid = el('div', { class: 'dashboard-grid' }, [identityCard, ...orderedWidgetCards, el('div', { class: 'dashboard-card full', style: { padding: '10px' } }, [exportRow, importBtn, fileInput, gpxImportBtn, gpxFileInput, fitImportBtn, fitFileInput, jsonImportBtn, jsonFileInput])]);
   requestAnimationFrame(() => {
     if (_dashboardSortable) { _dashboardSortable.destroy(); _dashboardSortable = null; }
     if (typeof Sortable === 'undefined') return;

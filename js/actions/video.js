@@ -164,6 +164,7 @@ export function releaseVideoPlayback() {
     skeletonFrames: null, detectingSkeleton: false, detectingSkeletonProgress: 0,
     skeletonConfidence: null, skeletonAnalyzedSeconds: null,
     skeletonVideoWidth: null, skeletonVideoHeight: null, skeletonError: null,
+    skeletonMetrics: null, skeletonIdentity: null,
   };
 }
 
@@ -222,10 +223,7 @@ export function saveStrideEstimation(sessionId, { distance, time, strideFrequenc
 // Deteccion automatica de cadencia de zancada con MediaPipe Pose (ver
 // js/services/poseDetection.js). Solo RELLENA el campo de frecuencia -- el
 // entrenador sigue teniendo que darle a "Calcular longitud de zancada" para
-// confirmar, nunca se autoguarda. Requiere internet la primera vez (carga
-// el runtime WASM y el modelo de pose desde CDN); esto es una excepcion
-// deliberada a la regla de "todo el video es local" del resto de esta
-// funcionalidad -- ver aviso en la UI.
+// confirmar, nunca se autoguarda. Corre 100% local (WASM y modelo en vendor/).
 export async function detectStrideCadence(sessionId, videoElId) {
   const vp = state.videoPlayback;
   if (vp.detectingCadence || vp.detectingSkeleton) return; // ya hay un analisis en curso, ignora clics repetidos
@@ -266,9 +264,7 @@ export async function detectStrideCadence(sessionId, videoElId) {
 // en vp.skeletonFrames y de ahi los toma js/services/skeletonOverlay.js
 // para dibujar el "muñeco de palitos" sincronizado sobre el video, sin
 // necesidad de re-analizar cada vez que el entrenador reproduce el clip.
-// Igual que la deteccion de cadencia, requiere internet la primera vez
-// (carga el runtime WASM y el modelo desde CDN); el resto del video es
-// 100% local.
+// Igual que la deteccion de cadencia, corre 100% local (WASM y modelo en vendor/).
 export async function analyzeFullSprint(sessionId, videoElId) {
   const vp = state.videoPlayback;
   if (vp.detectingCadence || vp.detectingSkeleton) return; // ya hay un analisis en curso, ignora clics repetidos
@@ -295,6 +291,8 @@ export async function analyzeFullSprint(sessionId, videoElId) {
       vp.skeletonAnalyzedSeconds = result.analyzedSeconds;
       vp.skeletonVideoWidth = result.videoWidth;
       vp.skeletonVideoHeight = result.videoHeight;
+      vp.skeletonMetrics = result.metrics || null;
+      vp.skeletonIdentity = result.identityReport || null;
       if (result.confidence === 'baja') {
         showToast('⚠ Detección poco confiable — el esqueleto puede verse errático');
       } else {
@@ -315,6 +313,8 @@ export function clearSkeletonCapture() {
   vp.skeletonAnalyzedSeconds = null;
   vp.skeletonVideoWidth = null;
   vp.skeletonVideoHeight = null;
+  vp.skeletonMetrics = null;
+  vp.skeletonIdentity = null;
   vp.skeletonError = null;
   render();
 }

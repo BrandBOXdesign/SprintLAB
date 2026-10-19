@@ -1,60 +1,61 @@
 // Fase 1.1: autenticacion y sincronizacion con Firestore.
 // Todo esto es opcional -- si no se configura Firebase (ver firebaseConfig.js),
 // la app sigue funcionando 100% en localStorage como hasta ahora.
-import {
-  createUserWithEmailAndPassword, onAuthStateChanged, signInWithEmailAndPassword, signOut,
-} from 'https://www.gstatic.com/firebasejs/12.15.0/firebase-auth.js';
-import {
-  collection, doc, getDocs, serverTimestamp, setDoc,
-} from 'https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore.js';
 import { DB } from '../db/db.js';
-import { auth, firestore, FIREBASE_CONFIGURED } from './firebaseConfig.js';
+import { FIREBASE_CONFIGURED, getFirebase } from './firebaseConfig.js';
 
 function requireFirebase() {
   if (!FIREBASE_CONFIGURED) throw new Error('Firebase no está configurado. Edita js/services/firebaseConfig.js primero.');
 }
 
+// Devuelve una función para cancelar la suscripción. Si Firebase no está
+// configurado, o no hay internet, avisa user=null y la app sigue en modo local.
 export function watchAuthState(callback) {
   if (!FIREBASE_CONFIGURED) { callback(null); return () => {}; }
-  return onAuthStateChanged(auth, (user) => callback(user));
+  let unsub = () => {}, cancelled = false;
+  getFirebase().then(({ auth, authApi }) => {
+    if (!cancelled) unsub = authApi.onAuthStateChanged(auth, (user) => callback(user));
+  }).catch((err) => { console.warn('Sprint Lab: sin conexión con Firebase, sigue el modo local.', err); callback(null); });
+  return () => { cancelled = true; unsub(); };
 }
 
 export async function signUp(email, password) {
-  requireFirebase();
-  const cred = await createUserWithEmailAndPassword(auth, email, password);
+  const { auth, authApi } = await getFirebase();
+  const cred = await authApi.createUserWithEmailAndPassword(auth, email, password);
   return cred.user;
 }
 
 export async function signIn(email, password) {
-  requireFirebase();
-  const cred = await signInWithEmailAndPassword(auth, email, password);
+  const { auth, authApi } = await getFirebase();
+  const cred = await authApi.signInWithEmailAndPassword(auth, email, password);
   return cred.user;
 }
 
 export async function signOutUser() {
-  requireFirebase();
-  await signOut(auth);
+  const { auth, authApi } = await getFirebase();
+  await authApi.signOut(auth);
 }
 
-function athleteDocRef(uid, athleteId) {
-  return doc(firestore, 'users', uid, 'athletes', athleteId);
+function athleteDocRef(fb, uid, athleteId) {
+  return fb.fsApi.doc(fb.firestore, 'users', uid, 'athletes', athleteId);
 }
 
 // Sube UN atleta (perfil + sesiones + modelo + plan semanal + notas + notificaciones
 // descartadas) al documento Firestore correspondiente. `merge: true` para no
 // pisar campos que no mandamos (por si en el futuro se agregan mas).
 export async function pushAthleteToCloud(uid, athleteId) {
-  requireFirebase();
+  const fb = await getFirebase();
   const payload = {
     profile: DB.getAthlete(athleteId),
     sessions: DB.getSessions(athleteId),
     model: DB.getModel(athleteId),
     weeklyPlan: DB.getWeeklyPlan(athleteId),
+    customPhases: DB.getCustomPhases(athleteId),
     clinicalNotes: DB.getClinicalNotes(athleteId),
     dismissedIds: DB.getDismissedNotifications(athleteId),
-    updatedAt: serverTimestamp(),
+    updatedAt: fb.fsApi.serverTimestamp(),
   };
-  await setDoc(athleteDocRef(uid, athleteId), payload, { merge: true });
+  await fb.fsApi.setDoc(athleteDocRef(fb, uid, athleteId), payload, { merge: true });
 }
 
 export async function pushAllAthletesToCloud(uid) {
@@ -70,7 +71,8 @@ export async function pushAllAthletesToCloud(uid) {
 // timestamps por campo o un CRDT, que queda fuera del alcance de esta fase.
 export async function pullAllAthletesFromCloud(uid) {
   requireFirebase();
-  const snap = await getDocs(collection(firestore, 'users', uid, 'athletes'));
+  const fb = await getFirebase();
+  const snap = await fb.fsApi.getDocs(fb.fsApi.collection(fb.firestore, 'users', uid, 'athletes'));
   const localIds = new Set(DB.getAthleteIds());
   snap.forEach(docSnap => {
     const athleteId = docSnap.id;
@@ -79,6 +81,7 @@ export async function pullAllAthletesFromCloud(uid) {
     if (data.sessions) DB.saveSessions(athleteId, data.sessions);
     if (data.model !== undefined) DB.saveModel(athleteId, data.model);
     if (data.weeklyPlan) DB.saveWeeklyPlan(athleteId, data.weeklyPlan);
+    if (Array.isArray(data.customPhases)) DB.saveCustomPhases(athleteId, data.customPhases);
     if (data.clinicalNotes) DB.saveClinicalNotes(athleteId, data.clinicalNotes);
     if (data.dismissedIds) DB.saveDismissedNotifications(athleteId, data.dismissedIds);
     localIds.add(athleteId);

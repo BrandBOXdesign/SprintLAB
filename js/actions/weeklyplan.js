@@ -10,7 +10,10 @@ export function autoAdjustWeek() {
   const level = state.athlete.level || 'intermedio';
   const newPlan = state.weeklyPlan.map(day => {
     let suffix = '';
-    let duration = day.plannedDuration || 60;
+    // Siempre se ajusta desde la duración BASE (la que puso el entrenador), no desde el último ajuste:
+    // si no, cada clic multiplicaba otra vez por 1,2 o 0,8. baseDuration se borra al editar a mano.
+    const base = day.baseDuration ?? (day.plannedDuration ?? 60);
+    let duration = base;
     if (day.type !== 'rest') {
       if (ratio !== null) {
         if (ratio < 0.8) { suffix += ' (↑ volumen)'; duration = Math.round(duration * 1.2); }
@@ -19,7 +22,7 @@ export function autoAdjustWeek() {
       if (level === 'avanzado') suffix += ' · alta exigencia';
       else if (level === 'principiante') suffix += ' · técnica prioritaria';
     }
-    return { ...day, customLabel: (day.label || '') + suffix, plannedDuration: Math.max(0, duration) };
+    return { ...day, baseDuration: base, customLabel: (day.label || '') + suffix, plannedDuration: Math.max(0, duration) };
   });
   state.weeklyPlan = newPlan;
   DB.saveWeeklyPlan(state.currentAthleteId, newPlan);
@@ -40,7 +43,7 @@ export function applySuggestion(totalVolume, rpeTarget) {
   const currentTotal = activeDays.reduce((sum, d) => sum + (d.plannedDuration || 0), 0);
   if (currentTotal === 0) {
     const perDay = Math.max(5, Math.round(totalVolume / activeDays.length));
-    activeDays.forEach(d => { d.plannedDuration = perDay; });
+    activeDays.forEach(d => { d.plannedDuration = perDay; delete d.baseDuration; });
   } else {
     let assigned = 0;
     activeDays.forEach((d, i) => {
@@ -49,6 +52,7 @@ export function applySuggestion(totalVolume, rpeTarget) {
       if (amount < 5) amount = 5;
       if (i === activeDays.length - 1) amount = Math.max(5, totalVolume - assigned); // el ultimo dia absorbe el redondeo
       d.plannedDuration = amount;
+      delete d.baseDuration;
       assigned += amount;
     });
   }
