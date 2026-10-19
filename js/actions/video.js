@@ -164,6 +164,7 @@ export function releaseVideoPlayback() {
     skeletonFrames: null, detectingSkeleton: false, detectingSkeletonProgress: 0,
     skeletonConfidence: null, skeletonAnalyzedSeconds: null,
     skeletonVideoWidth: null, skeletonVideoHeight: null, skeletonError: null,
+    skeletonMetrics: null, skeletonIdentity: null,
   };
 }
 
@@ -290,6 +291,8 @@ export async function analyzeFullSprint(sessionId, videoElId) {
       vp.skeletonAnalyzedSeconds = result.analyzedSeconds;
       vp.skeletonVideoWidth = result.videoWidth;
       vp.skeletonVideoHeight = result.videoHeight;
+      vp.skeletonMetrics = result.metrics || null;
+      vp.skeletonIdentity = result.identityReport || null;
       if (result.confidence === 'baja') {
         showToast('⚠ Detección poco confiable — el esqueleto puede verse errático');
       } else {
@@ -310,6 +313,8 @@ export function clearSkeletonCapture() {
   vp.skeletonAnalyzedSeconds = null;
   vp.skeletonVideoWidth = null;
   vp.skeletonVideoHeight = null;
+  vp.skeletonMetrics = null;
+  vp.skeletonIdentity = null;
   vp.skeletonError = null;
   render();
 }

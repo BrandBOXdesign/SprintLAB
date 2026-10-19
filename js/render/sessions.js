@@ -222,6 +222,32 @@ function renderStrideEstimator(s, videoElId) {
 // skeletonOverlay.js sobre el <canvas> que ya se agrego junto al <video> en
 // renderVideoBlock(). Este panel solo controla cuándo correr el análisis y
 // muestra confianza/errores, igual que el patrón ya usado para cadencia.
+const fmtN = (v, d = 1) => (v === null || v === undefined || !Number.isFinite(v) ? '—' : v.toFixed(d));
+const fmtMs = v => (v === null || v === undefined || !Number.isFinite(v) ? '—' : Math.round(v * 1000) + ' ms');
+
+// Resumen de métricas (trackingMetrics.js) + correcciones de identidad (trackingIdentity.js).
+function renderSkeletonMetrics() {
+  const vp = state.videoPlayback;
+  const m = vp.skeletonMetrics;
+  if (!m || !m.resumen) return null;
+  const r = m.resumen, izq = r.porPie.izq, der = r.porPie.der;
+  const row = (label, value) => el('div', { class: 'calc-hint', style: { display: 'flex', justifyContent: 'space-between', gap: '8px' } }, [el('span', {}, label), el('strong', {}, value)]);
+  const swaps = vp.skeletonIdentity ? vp.skeletonIdentity.swapsDetected : 0;
+  const warns = (m.advertencias || []).slice(0, 4);
+  return el('div', { class: 'stride-calc-box', style: { marginTop: '6px' } }, [
+    el('div', { class: 'series-block-title' }, 'Métricas del clip (cámara única 2D: orientativas)'),
+    row('Cadencia', fmtN(r.cadenciaPasosPorSeg, 2) + ' pasos/s'),
+    row('Contacto medio (izq / der)', `${fmtMs(izq.tiempoContactoMedio)} / ${fmtMs(der.tiempoContactoMedio)}`),
+    row('Vuelo medio (izq / der)', `${fmtMs(izq.tiempoVueloMedio)} / ${fmtMs(der.tiempoVueloMedio)}`),
+    row('Rodilla, ángulo mínimo medio (izq / der)', `${fmtN(izq.anguloRodillaMinMedio, 0)}° / ${fmtN(der.anguloRodillaMinMedio, 0)}°`),
+    row('Altura de rodilla máx. (fémures, izq / der)', `${fmtN(izq.alturaRodillaMaxMedia, 2)} / ${fmtN(der.alturaRodillaMaxMedia, 2)}${r.femurConfiable ? '' : ' ⚠'}`),
+    row('Simetría de contacto', r.simetria.tiempoContacto === null ? '—' : fmtN(r.simetria.tiempoContacto, 1) + ' %'),
+    row('Cuadros inutilizables', fmtN(r.cuadrosInutilizablesPct, 0) + ' %'),
+    row('Cambios izq/der corregidos', String(swaps)),
+    ...warns.map(w => el('div', { class: 'field-warn' }, '⚠ ' + w)),
+  ]);
+}
+
 function renderSkeletonCapture(s, videoElId) {
   const vp = state.videoPlayback;
   const busy = vp.detectingCadence || vp.detectingSkeleton;
@@ -254,14 +280,15 @@ function renderSkeletonCapture(s, videoElId) {
   ) : null;
 
   return el('div', { class: 'stride-calc-box' }, [
-    el('div', { class: 'series-block-title' }, 'Esqueleto completo (Fase A — solo visual, sin calificación)'),
+    el('div', { class: 'series-block-title' }, 'Esqueleto completo y métricas'),
     el('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center', marginBottom: '6px' } }, [captureBtn, clearBtn].filter(Boolean)),
     progressNode,
     confidenceBadge,
     errorNode,
     resultNode,
+    (!vp.detectingSkeleton && hasFrames) ? renderSkeletonMetrics() : null,
     el('p', { class: 'help-p', style: { marginTop: '2px', marginBottom: '4px', fontSize: '11.5px' } },
-      'Rastrea cadera, rodillas, tobillos, hombros, codos, muñecas y pies (los mismos 15 segundos máximo que la detección de cadencia). Dibuja un muñeco de palitos sincronizado con la reproducción del video, sobre una capa oscura semitransparente para que se lea bien. Todavía no da ángulos ni calificaciones de técnica — eso vendría en una fase posterior. Requiere internet la primera vez que se usa.'),
+      'Rastrea cadera, rodillas, tobillos, hombros, codos, muñecas y pies (los mismos 15 segundos máximo que la detección de cadencia). Dibuja un muñeco de palitos sincronizado con la reproducción del video, sobre una capa oscura semitransparente para que se lea bien. Corrige los cambios de pierna o brazo izquierda/derecha y calcula cadencia, tiempos de contacto y vuelo, ángulo de rodilla y altura de rodilla (con una sola cámara, son valores orientativos: revísalos contra el video). Funciona sin internet.'),
   ].filter(Boolean));
 }
 

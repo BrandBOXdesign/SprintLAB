@@ -9,6 +9,8 @@
 // analisis de video funciona 100% local, sin internet.
 import { FilesetResolver, PoseLandmarker } from '../../vendor/mediapipe/vision_bundle.mjs';
 import { countContacts, fillGapsWithMotionInterpolation, rejectImplausibleDetections } from './poseLogic.js';
+import { applyIdentityTracking } from './trackingIdentity.js';
+import { computeMetrics } from './trackingMetrics.js';
 
 const WASM_URL = new URL('../../vendor/mediapipe/wasm', import.meta.url).href;
 const MODEL_URL = new URL('../../vendor/models/pose_landmarker_lite.task', import.meta.url).href;
@@ -302,6 +304,22 @@ export async function analyzeFullSkeleton(videoEl, opts = {}) {
     } catch { /* el navegador puede bloquear el autoplay tras manipular el video; no es critico */ }
   }
 
+  // 1) Identidad izquierda/derecha: corrige intercambios de pierna/brazo ANTES de
+  //    rechazar saltos (un swap se vería como un "salto" y se descartaría el punto
+  //    bueno). Si el módulo fallara, se sigue con los datos tal cual: capturar el
+  //    esqueleto nunca debe romperse por esta capa extra.
+  let identityReport = null;
+  let tracked = frames;
+  try {
+    const idResult = applyIdentityTracking(frames);
+    tracked = idResult.frames.map((f, i) => ({ ...f, sampleIndex: frames[i].sampleIndex }));
+    identityReport = idResult.report;
+  } catch (err) {
+    console.warn('analyzeFullSkeleton: applyIdentityTracking falló, se usan las etiquetas originales.', err);
+  }
+  frames.length = 0;
+  frames.push(...tracked);
+
   rejectImplausibleDetections(frames, SKELETON_LANDMARKS);
   fillGapsWithMotionInterpolation(frames, SKELETON_LANDMARKS);
   // Ya rellenados los huecos cortos, se puede sacar el sampleIndex interno
@@ -312,11 +330,25 @@ export async function analyzeFullSkeleton(videoEl, opts = {}) {
     .filter(f => Object.keys(f.pts).length > 0)
     .map(f => ({ t: f.t, pts: f.pts }));
 
+  // 2) Métricas biomecánicas sobre la rejilla completa de tiempo (los cuadros sin
+  //    detección quedan vacíos para que el módulo vea el paso de tiempo real).
+  let metrics = null;
+  try {
+    metrics = computeMetrics(
+      frames.map(f => ({ t: f.t, pts: f.pts })),
+      { videoWidth: videoEl.videoWidth, videoHeight: videoEl.videoHeight },
+    );
+  } catch (err) {
+    console.warn('analyzeFullSkeleton: computeMetrics falló; el esqueleto se muestra sin métricas.', err);
+  }
+
   const detectionRate = totalFrames > 0 ? detectedFrames / totalFrames : 0;
   const confidence = detectionRate > 0.8 ? 'alta' : detectionRate >= 0.5 ? 'media' : 'baja';
 
   return {
     frames: cleanFrames,
+    identityReport,
+    metrics,
     analyzedSeconds: Math.round(totalDuration * 100) / 100,
     confidence,
     detectionRate: Math.round(detectionRate * 100) / 100,
