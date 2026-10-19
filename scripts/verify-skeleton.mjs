@@ -79,9 +79,30 @@ function startServer(videoPath) {
         const ext = path.extname(filePath).toLowerCase();
         const data = await readFile(filePath);
 
+        // El servidor DEBE soportar peticiones Range (206): sin ellas Chromium no puede
+        // hacer seek en un mp4 (duración mal detectada y "Target crashed" al saltar de instante).
+        const range = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range || '');
+        if (range && (range[1] !== '' || range[2] !== '')) {
+          const total = data.length;
+          let start = range[1] === '' ? total - Number(range[2]) : Number(range[1]);
+          let end = range[1] === '' || range[2] === '' ? total - 1 : Number(range[2]);
+          start = Math.max(0, start); end = Math.min(total - 1, end);
+          if (start > end) { res.writeHead(416, { 'Content-Range': `bytes */${total}` }); res.end(); return; }
+          res.writeHead(206, {
+            'Content-Type': MIME[ext] || 'application/octet-stream',
+            'Accept-Ranges': 'bytes',
+            'Content-Range': `bytes ${start}-${end}/${total}`,
+            'Content-Length': end - start + 1,
+            'Cache-Control': 'no-store'
+          });
+          res.end(data.subarray(start, end + 1));
+          return;
+        }
+
         res.writeHead(200, {
           'Content-Type': MIME[ext] || 'application/octet-stream',
           'Accept-Ranges': 'bytes',
+          'Content-Length': data.length,
           'Cache-Control': 'no-store'
         });
 
@@ -238,7 +259,7 @@ async function main() {
 
   const browser = await chromium.launch();
 
-  const page = await browser.newPage({
+  let page = await browser.newPage({
     viewport: {
       width: 700,
       height: 500
@@ -286,6 +307,18 @@ async function main() {
       'Resultado del análisis:',
       analysisResult
     );
+
+    // El "Target crashed" ocurría al hacer seek en la MISMA pestaña donde corrió MediaPipe
+    // (memoria WASM + contexto WebGL ya usados). Se guardan los cuadros analizados, se cierra
+    // esa pestaña y las capturas se hacen en una pestaña NUEVA con solo video y canvas.
+    const analyzedFrames = await page.evaluate(() => window.__harness.frames);
+    await page.close();
+    page = await browser.newPage({ viewport: { width: 700, height: 500 } });
+    page.on('console', msg => console.log(`[navegador:${msg.type()}]`, msg.text()));
+    page.on('pageerror', err => console.error('[navegador:error-no-capturado]', err));
+    await page.goto(harnessUrl, { waitUntil: 'load' });
+    await page.evaluate(() => window.__harness.loadVideo());
+    await page.evaluate((fr) => { window.__harness.frames = fr; }, analyzedFrames);
 
     const targetTimes =
       times && times.length > 0
