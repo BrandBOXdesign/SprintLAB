@@ -210,7 +210,7 @@ function renderStrideEstimator(s, videoElId) {
     confidenceBadge,
     cadenceErrorNode,
     el('p', { class: 'help-p', style: { marginTop: '2px', marginBottom: '10px', fontSize: '11.5px' } },
-      'La detección automática analiza como máximo los primeros 15 segundos del video y funciona mejor con una toma lateral del corredor, buena resolución y sin que nadie lo tape. Es un punto de partida, no una medición exacta — siempre revisa el número antes de calcular. Requiere internet la primera vez que se usa (descarga el modelo de análisis).'),
+      'La detección automática analiza como máximo los primeros 15 segundos del video y funciona mejor con una toma lateral del corredor, buena resolución y sin que nadie lo tape. Es un punto de partida, no una medición exacta — siempre revisa el número antes de calcular. Funciona sin internet.'),
     calcBtn,
     resultNode,
   ].filter(Boolean));
